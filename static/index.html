@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAN Chat + Voice + Files</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 10px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; text-align: center; }
+    #userlist {
+      border: 1px solid #ccc;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 5px 0;
+    }
+    .call-btn {
+      background: #28a745;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .call-btn:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    #messages {
+      height: 250px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .message { margin: 5px 0; }
+    .message .time { color: #999; font-size: 0.8em; margin-left: 10px; }
+    .system { color: #888; font-style: italic; }
+    .file-message { margin: 5px 0; }
+    .file-message img { max-width: 100%; border-radius: 5px; }
+    #inputArea {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #fileArea {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    #fileInput {
+      flex: 1;
+      padding: 5px;
+    }
+    button {
+      padding: 8px 15px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    #callStatus {
+      margin: 10px 0;
+      padding: 10px;
+      background: #e9f7ef;
+      border-radius: 5px;
+      display: none;
+    }
+    #callControls {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #muteBtn { background: #ffc107; }
+    #hangupBtn { background: #dc3545; }
+    #incomingCall {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <h1>LAN Chat + Voice + Files</h1>
+  <div id="userlist">Online: </div>
+  <div id="messages"></div>
+  <div id="inputArea">
+    <input type="text" id="messageInput" placeholder="Type a message..." />
+    <button id="sendButton">Send</button>
+  </div>
+  <div id="fileArea">
+    <input type="file" id="fileInput" />
+    <button id="uploadButton">Upload</button>
+  </div>
+
+  <div id="callStatus">
+    <span id="callStatusText">In call</span>
+    <div id="callControls">
+      <button id="muteBtn">Mute</button>
+      <button id="hangupBtn">Hang Up</button>
+    </div>
+  </div>
+
+  <div id="incomingCall">
+    <p><strong id="incomingCallUser"></strong> is calling you...</p>
+    <button id="acceptCallBtn" style="background:#28a745;">Accept</button>
+    <button id="rejectCallBtn" style="background:#dc3545;">Reject</button>
+  </div>
+
+  <script>
+    let ws;
+    let myId = null;
+    let myUsername = null;
+
+    function connect() {
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(protocol + window.location.host + '/ws');
+
+      ws.onopen = () => console.log('Connected');
+      ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+      ws.onclose = () => setTimeout(connect, 2000);
+    }
+
+    function handleMessage(data) {
+      const messagesDiv = document.getElementById('messages');
+      const userlistDiv = document.getElementById('userlist');
+
+      switch (data.type) {
+        case 'welcome':
+          myId = data.id;
+          myUsername = data.username;
+          console.log('My ID:', myId, 'Username:', myUsername);
+          break;
+
+        case 'userlist':
+          updateUserList(data.users);
+          break;
+
+        case 'chat':
+          const div = document.createElement('div');
+          div.className = 'message';
+          const time = new Date(data.timestamp).toLocaleTimeString();
+          div.innerHTML = `<strong>${data.username}:</strong> ${escapeHtml(data.text)}<span class="time">${time}</span>`;
+          messagesDiv.appendChild(div);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+          break;
+
+        case 'file':
+          handleFileMessage(data);
+          break;
+
+        case 'system':
+          const sysDiv = document.createElement('div');
+          sysDiv.className = 'system';
+          sysDiv.textContent = data.text;
+          messagesDiv.appendChild(sysDiv);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+          break;
+
+        // -------- WebRTC signaling messages --------
+        case 'call-request':
+          handleIncomingCall(data.from, data.fromUsername);
+          break;
+
+        case 'call-accept':
+          handleCallAccepted(data.from);
+          break;
+
+        case 'call-reject':
+          handleCallRejected();
+          break;
+
+        case 'call-end':
+          handleCallEnded();
+          break;
+
+        case 'offer':
+          handleOffer(data.from, data.sdp);
+          break;
+
+        case 'answer':
+          handleAnswer(data.from, data.sdp);
+          break;
+
+        case 'ice-candidate':
+          handleIceCandidate(data.from, data.candidate);
+          break;
+      }
+    }
+
+    function handleFileMessage(data) {
+      const messagesDiv = document.getElementById('messages');
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'file-message';
+      const time = new Date(data.timestamp).toLocaleTimeString();
+
+      if (data.content_type && data.content_type.startsWith('image/')) {
+        fileDiv.innerHTML = `<strong>${data.username}:</strong> shared an image<br>
+          <img src="${data.url}" alt="${escapeHtml(data.filename)}" /> <span class="time">${time}</span>`;
+      } else {
+        fileDiv.innerHTML = `<strong>${data.username}:</strong> shared a file: 
+          <a href="${data.url}" download="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>
+          <span class="time">${time}</span>`;
+      }
+      messagesDiv.appendChild(fileDiv);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function updateUserList(users) {
+      const userlistDiv = document.getElementById('userlist');
+      let html = 'Online: ';
+      users.forEach(user => {
+        html += `<div class="user-item">
+          <span>${user.username}</span>
+          ${user.id !== myId ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
+        </div>`;
+      });
+      userlistDiv.innerHTML = html;
+
+      document.querySelectorAll('.call-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.getAttribute('data-id');
+          startCall(targetId);
+        });
+      });
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (text && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'chat', text }));
+        input.value = '';
+      }
+    }
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('Please select a file first.');
+        return;
+      }
+
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('file', file);
+      if (myId) {
+        formData.append('user_id', myId);
+      }
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (response.ok) {
+          console.log('File uploaded successfully');
+          fileInput.value = ''; // clear input
+        } else {
+          console.error('Upload failed');
+        }
+      } catch (err) {
+        console.error('Upload error:', err);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ------------------------------------------------------------
+    // WebRTC call handling (unchanged)
+    // ------------------------------------------------------------
+    let localStream = null;
+    let peerConnection = null;
+    let currentCallPartnerId = null;
+    let isMuted = false;
+    let isInCall = false;
+
+    async function startCall(targetId) {
+      if (isInCall) {
+        alert('You are already in a call. Hang up first.');
+        return;
+      }
+      currentCallPartnerId = targetId;
+      ws.send(JSON.stringify({ type: 'call-request', target: targetId }));
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        alert('Microphone access denied or not available.');
+        ws.send(JSON.stringify({ type: 'call-end', target: targetId }));
+        currentCallPartnerId = null;
+        return;
+      }
+      showCallStatus(`Calling...`);
+    }
+
+    function handleIncomingCall(fromId, fromUsername) {
+      if (isInCall) {
+        ws.send(JSON.stringify({ type: 'call-reject', target: fromId }));
+        return;
+      }
+      currentCallPartnerId = fromId;
+      document.getElementById('incomingCallUser').textContent = fromUsername;
+      document.getElementById('incomingCall').style.display = 'block';
+    }
+
+    document.getElementById('acceptCallBtn').addEventListener('click', async () => {
+      document.getElementById('incomingCall').style.display = 'none';
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        alert('Microphone access denied or not available.');
+        ws.send(JSON.stringify({ type: 'call-reject', target: currentCallPartnerId }));
+        currentCallPartnerId = null;
+        return;
+      }
+      ws.send(JSON.stringify({ type: 'call-accept', target: currentCallPartnerId }));
+      await createPeerConnection();
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      ws.send(JSON.stringify({ type: 'offer', target: currentCallPartnerId, sdp: offer }));
+      showCallStatus(`In call with ${currentCallPartnerId}`);
+      isInCall = true;
+    });
+
+    document.getElementById('rejectCallBtn').addEventListener('click', () => {
+      document.getElementById('incomingCall').style.display = 'none';
+      ws.send(JSON.stringify({ type: 'call-reject', target: currentCallPartnerId }));
+      currentCallPartnerId = null;
+    });
+
+    function handleCallAccepted(fromId) {
+      if (currentCallPartnerId === fromId) {
+        createPeerConnection().then(async () => {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          ws.send(JSON.stringify({ type: 'offer', target: fromId, sdp: offer }));
+          showCallStatus(`In call with ${fromId}`);
+          isInCall = true;
+        });
+      }
+    }
+
+    function handleCallRejected() {
+      alert('Call rejected by the other user.');
+      cleanupCall();
+      hideCallStatus();
+    }
+
+    function handleCallEnded() {
+      alert('Call ended by the other user.');
+      cleanupCall();
+      hideCallStatus();
+    }
+
+    function hangup() {
+      if (currentCallPartnerId) {
+        ws.send(JSON.stringify({ type: 'call-end', target: currentCallPartnerId }));
+      }
+      cleanupCall();
+      hideCallStatus();
+    }
+
+    function cleanupCall() {
+      if (peerConnection) {
+        peerConnection.onicecandidate = null;
+        peerConnection.ontrack = null;
+        peerConnection.close();
+        peerConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      currentCallPartnerId = null;
+      isInCall = false;
+      isMuted = false;
+      document.getElementById('muteBtn').textContent = 'Mute';
+    }
+
+    function showCallStatus(text) {
+      document.getElementById('callStatusText').textContent = text;
+      document.getElementById('callStatus').style.display = 'block';
+    }
+
+    function hideCallStatus() {
+      document.getElementById('callStatus').style.display = 'none';
+    }
+
+    async function createPeerConnection() {
+      peerConnection = new RTCPeerConnection();
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+      peerConnection.ontrack = (event) => {
+        const remoteAudio = new Audio();
+        remoteAudio.srcObject = event.streams[0];
+        remoteAudio.play().catch(e => console.log('Playback error:', e));
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          ws.send(JSON.stringify({
+            type: 'ice-candidate',
+            target: currentCallPartnerId,
+            candidate: event.candidate
+          }));
+        }
+      };
+
+      return peerConnection;
+    }
+
+    async function handleOffer(fromId, sdp) {
+      if (currentCallPartnerId !== fromId) return;
+      await createPeerConnection();
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      ws.send(JSON.stringify({ type: 'answer', target: fromId, sdp: answer }));
+      showCallStatus(`In call with ${fromId}`);
+      isInCall = true;
+    }
+
+    async function handleAnswer(fromId, sdp) {
+      if (currentCallPartnerId !== fromId) return;
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+    }
+
+    function handleIceCandidate(fromId, candidate) {
+      if (currentCallPartnerId !== fromId || !peerConnection) return;
+      peerConnection.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.log('Error adding ICE:', e));
+    }
+
+    // Mute button
+    document.getElementById('muteBtn').addEventListener('click', () => {
+      if (!localStream) return;
+      isMuted = !isMuted;
+      localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+      document.getElementById('muteBtn').textContent = isMuted ? 'Unmute' : 'Mute';
+    });
+
+    // Hang up button
+    document.getElementById('hangupBtn').addEventListener('click', hangup);
+
+    // Chat send handlers
+    document.getElementById('sendButton').addEventListener('click', sendMessage);
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // File upload handler
+    document.getElementById('uploadButton').addEventListener('click', uploadFile);
+
+    // Start
+    connect();
+  </script>
+</body>
+</html>

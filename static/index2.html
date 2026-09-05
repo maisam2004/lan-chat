@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAN Chat (Python)</title>
+  <style>
+    /* Simple, clean CSS – replace with Tailwind if you have it locally */
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 10px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; text-align: center; }
+    #userlist {
+      border: 1px solid #ccc;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    #messages {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .message { margin: 5px 0; }
+    .message .time { color: #999; font-size: 0.8em; margin-left: 10px; }
+    .system { color: #888; font-style: italic; }
+    #inputArea {
+      display: flex;
+      gap: 5px;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 8px 15px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    #callButton {
+      background: #28a745;
+      margin-top: 10px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>LAN Chat Room</h1>
+  <div id="userlist">Online: </div>
+  <div id="messages"></div>
+  <div id="inputArea">
+    <input type="text" id="messageInput" placeholder="Type a message..." />
+    <button id="sendButton">Send</button>
+  </div>
+  <button id="callButton" disabled title="Voice calls will be added later">🔇 Voice call (coming soon)</button>
+
+  <script>
+    let ws;
+
+    function connect() {
+      // Connect to the WebSocket server at the same address as the page
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(protocol + window.location.host + '/ws');
+
+      ws.onopen = () => {
+        console.log('Connected');
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleMessage(data);
+      };
+
+      ws.onclose = () => {
+        // Try to reconnect after 2 seconds
+        setTimeout(connect, 2000);
+      };
+    }
+
+    function handleMessage(data) {
+      const messagesDiv = document.getElementById('messages');
+      const userlistDiv = document.getElementById('userlist');
+
+      if (data.type === 'welcome') {
+        console.log('Welcome, your username is', data.username);
+      } else if (data.type === 'userlist') {
+        userlistDiv.innerHTML = 'Online: ' + data.users.join(', ');
+      } else if (data.type === 'chat') {
+        const div = document.createElement('div');
+        div.className = 'message';
+        const time = new Date(data.timestamp).toLocaleTimeString();
+        div.innerHTML = `<strong>${data.username}:</strong> ${escapeHtml(data.text)}<span class="time">${time}</span>`;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      } else if (data.type === 'system') {
+        const div = document.createElement('div');
+        div.className = 'system';
+        div.textContent = data.text;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (text && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'chat', text }));
+        input.value = '';
+      }
+    }
+
+    document.getElementById('sendButton').addEventListener('click', sendMessage);
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    connect();
+  </script>
+</body>
+</html>
