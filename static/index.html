@@ -179,11 +179,57 @@
       if (!pw) return;
       authPassword = pw;
       sessionStorage.setItem('lanChatPassword', pw);
+      warmUpMicrophone();
       connect();
     });
     passwordInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') document.getElementById('loginButton').click();
     });
+
+    // ---------------- Ringtone (Web Audio) ----------------
+    let ringtoneCtx = null;
+    let ringtoneTimer = null;
+
+    function startRingtone() {
+      stopRingtone();
+      try {
+        ringtoneCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const beep = () => {
+          if (!ringtoneCtx) return;
+          const osc = ringtoneCtx.createOscillator();
+          const gain = ringtoneCtx.createGain();
+          osc.connect(gain);
+          gain.connect(ringtoneCtx.destination);
+          osc.type = 'sine';
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, ringtoneCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.15, ringtoneCtx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ringtoneCtx.currentTime + 0.5);
+          osc.start(ringtoneCtx.currentTime);
+          osc.stop(ringtoneCtx.currentTime + 0.55);
+        };
+        beep();
+        ringtoneTimer = setInterval(beep, 1200);
+      } catch (e) {
+        console.log('Ringtone error:', e);
+      }
+    }
+
+    function stopRingtone() {
+      if (ringtoneTimer) { clearInterval(ringtoneTimer); ringtoneTimer = null; }
+      if (ringtoneCtx) { ringtoneCtx.close().catch(() => {}); ringtoneCtx = null; }
+    }
+
+    // ---------------- Proactive mic permission ----------------
+    async function warmUpMicrophone() {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        s.getTracks().forEach(t => t.stop());
+        console.log('Microphone permission granted.');
+      } catch (e) {
+        console.warn('Microphone permission denied or unavailable:', e);
+      }
+    }
 
     // ---------------- WebSocket ----------------
     function connect() {
@@ -196,7 +242,6 @@
       ws = new WebSocket(protocol + window.location.host + '/ws');
 
       ws.onopen = () => {
-        // Send password as the very first message
         ws.send(JSON.stringify({ type: 'auth', password: authPassword }));
       };
 
@@ -204,14 +249,12 @@
 
       ws.onclose = (event) => {
         if (event.code === 1008) {
-          // Auth failed
           sessionStorage.removeItem('lanChatPassword');
           authPassword = null;
           passwordInput.value = '';
           showLogin('Wrong password. Try again.');
           return;
         }
-        // Normal disconnect — try to reconnect
         reconnectTimer = setTimeout(connect, 2000);
       };
     }
@@ -368,9 +411,11 @@
       currentCallPartnerId = fromId;
       document.getElementById('incomingCallUser').textContent = fromUsername;
       document.getElementById('incomingCall').style.display = 'block';
+      startRingtone();
     }
 
     document.getElementById('acceptCallBtn').addEventListener('click', async () => {
+      stopRingtone();
       document.getElementById('incomingCall').style.display = 'none';
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -390,6 +435,7 @@
     });
 
     document.getElementById('rejectCallBtn').addEventListener('click', () => {
+      stopRingtone();
       document.getElementById('incomingCall').style.display = 'none';
       ws.send(JSON.stringify({ type: 'call-reject', target: currentCallPartnerId }));
       currentCallPartnerId = null;
@@ -416,6 +462,7 @@
     }
 
     function cleanupCall() {
+      stopRingtone();
       if (peerConnection) {
         peerConnection.onicecandidate = null;
         peerConnection.ontrack = null;
@@ -496,6 +543,7 @@
 
     // ---------------- Start ----------------
     if (authPassword) {
+      warmUpMicrophone();
       connect();
     } else {
       showLogin();
