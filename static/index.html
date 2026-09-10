@@ -151,7 +151,7 @@
     <button id="acceptCallBtn" style="background:#28a745;">Accept</button>
     <button id="rejectCallBtn" style="background:#dc3545;">Reject</button>
   </div>
-
+  <audio id="remoteAudio" autoplay playsinline></audio>
   <script>
     let ws;
     let myId = null;
@@ -473,6 +473,8 @@
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
       }
+      const remoteAudio = document.getElementById('remoteAudio');
+      if (remoteAudio) remoteAudio.srcObject = null;
       currentCallPartnerId = null;
       isInCall = false;
       isMuted = false;
@@ -486,13 +488,21 @@
     function hideCallStatus() { document.getElementById('callStatus').style.display = 'none'; }
 
     async function createPeerConnection() {
-      peerConnection = new RTCPeerConnection();
+      peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
       peerConnection.ontrack = (event) => {
-        const remoteAudio = new Audio();
+        const remoteAudio = document.getElementById('remoteAudio');
         remoteAudio.srcObject = event.streams[0];
         remoteAudio.play().catch(e => console.log('Playback error:', e));
       };
+
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
           ws.send(JSON.stringify({
@@ -502,6 +512,14 @@
           }));
         }
       };
+
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', peerConnection.connectionState);
+      };
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE state:', peerConnection.iceConnectionState);
+      };
+
       return peerConnection;
     }
 
