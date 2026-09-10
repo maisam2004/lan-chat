@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
@@ -8,23 +9,17 @@ import time
 import string
 import os
 import shutil
-from typing import Dict
+from typing import List, Dict
 
 app = FastAPI()
 
-# ---------------------------------------------------------------------------
-# Password gate. Set the environment variable LAN_CHAT_PASSWORD before start.
-#   LAN_CHAT_PASSWORD=mypassword nohup python -m uvicorn ...
-# If not set, the default below is used.
-# ---------------------------------------------------------------------------
-PASSWORD = os.environ.get("LAN_CHAT_PASSWORD", "changeme123")
-
+# Ensure uploads directory exists
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# Serve static files and uploaded files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
 
 class ConnectionManager:
     def __init__(self):
@@ -34,8 +29,8 @@ class ConnectionManager:
     def generate_id(self) -> str:
         return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-    async def connect(self, websocket: WebSocket) -> str:
-        """Register an already-accepted WebSocket. Returns the new user_id."""
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
         user_id = self.generate_id()
         username = f"User-{random.randint(1000, 9999)}"
         self.active_connections[user_id] = websocket
@@ -48,12 +43,13 @@ class ConnectionManager:
         }))
         await self.broadcast_user_list()
         await self.broadcast_system(f"{username} joined the chat")
-        return user_id
 
     def disconnect(self, user_id: str):
         username = self.usernames.get(user_id, "Unknown")
-        self.active_connections.pop(user_id, None)
-        self.usernames.pop(user_id, None)
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+        if user_id in self.usernames:
+            del self.usernames[user_id]
         return username
 
     async def send_to_user(self, user_id: str, data: dict):
@@ -61,7 +57,7 @@ class ConnectionManager:
         if ws:
             try:
                 await ws.send_text(json.dumps(data))
-            except Exception:
+            except:
                 pass
 
     async def broadcast_user_list(self):
@@ -93,15 +89,13 @@ class ConnectionManager:
 
     async def broadcast(self, data: dict):
         message = json.dumps(data)
-        for ws in list(self.active_connections.values()):
+        for ws in self.active_connections.values():
             try:
                 await ws.send_text(message)
-            except Exception:
+            except:
                 pass
 
-
 manager = ConnectionManager()
-
 
 @app.get("/")
 async def get():
@@ -109,51 +103,39 @@ async def get():
         html_content = f.read()
     return HTMLResponse(content=html_content, status_code=200)
 
-
 @app.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    user_id: str = Form(None),
-    password: str = Form(None),
-):
-    # Password check
-    if password != PASSWORD:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
+async def upload_file(file: UploadFile = File(...), user_id: str = Form(None)):
+    # user_id is passed as form data from the client
+    # Generate unique filename
     ext = os.path.splitext(file.filename)[1] if file.filename else ""
     unique_name = f"{int(time.time())}_{random.randint(1000, 9999)}{ext}"
     file_path = os.path.join(UPLOAD_DIR, unique_name)
 
+    # Save the file
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Determine content type
     content_type = file.content_type or "application/octet-stream"
+
+    # Create URL for the file
+    # The client will access it via /uploads/{unique_name}
     file_url = f"/uploads/{unique_name}"
 
+    # Broadcast file message if user_id is provided and valid
     if user_id and user_id in manager.active_connections:
         await manager.broadcast_file(user_id, file.filename, file_url, content_type)
 
     return {"url": file_url, "filename": file.filename}
 
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-
-    # ----- Auth: first message must be {"type":"auth","password":"..."} -----
-    try:
-        raw = await websocket.receive_text()
-        first = json.loads(raw)
-    except Exception:
-        await websocket.close(code=1008, reason="Unauthorized")
-        return
-
-    if first.get("type") != "auth" or first.get("password") != PASSWORD:
-        await websocket.close(code=1008, reason="Unauthorized")
-        return
-
-    # ----- Auth OK: register with the manager -----
-    user_id = await manager.connect(websocket)
+    await manager.connect(websocket)
+    user_id = None
+    for uid, ws in manager.active_connections.items():
+        if ws == websocket:
+            user_id = uid
+            break
 
     try:
         while True:
@@ -177,37 +159,52 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif msg_type == "call-accept":
                     target_id = msg.get("target")
                     if target_id:
-                        await manager.send_to_user(target_id, {"type": "call-accept", "from": user_id})
+                        await manager.send_to_user(target_id, {
+                            "type": "call-accept",
+                            "from": user_id
+                        })
 
                 elif msg_type == "call-reject":
                     target_id = msg.get("target")
                     if target_id:
-                        await manager.send_to_user(target_id, {"type": "call-reject", "from": user_id})
+                        await manager.send_to_user(target_id, {
+                            "type": "call-reject",
+                            "from": user_id
+                        })
 
                 elif msg_type == "call-end":
                     target_id = msg.get("target")
                     if target_id:
-                        await manager.send_to_user(target_id, {"type": "call-end", "from": user_id})
+                        await manager.send_to_user(target_id, {
+                            "type": "call-end",
+                            "from": user_id
+                        })
 
                 elif msg_type == "offer":
                     target_id = msg.get("target")
                     if target_id:
                         await manager.send_to_user(target_id, {
-                            "type": "offer", "from": user_id, "sdp": msg.get("sdp")
+                            "type": "offer",
+                            "from": user_id,
+                            "sdp": msg.get("sdp")
                         })
 
                 elif msg_type == "answer":
                     target_id = msg.get("target")
                     if target_id:
                         await manager.send_to_user(target_id, {
-                            "type": "answer", "from": user_id, "sdp": msg.get("sdp")
+                            "type": "answer",
+                            "from": user_id,
+                            "sdp": msg.get("sdp")
                         })
 
                 elif msg_type == "ice-candidate":
                     target_id = msg.get("target")
                     if target_id:
                         await manager.send_to_user(target_id, {
-                            "type": "ice-candidate", "from": user_id, "candidate": msg.get("candidate")
+                            "type": "ice-candidate",
+                            "from": user_id,
+                            "candidate": msg.get("candidate")
                         })
 
             except json.JSONDecodeError:
@@ -219,7 +216,6 @@ async def websocket_endpoint(websocket: WebSocket):
         username = manager.disconnect(user_id)
         await manager.broadcast_user_list()
         await manager.broadcast_system(f"{username} left the chat")
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
