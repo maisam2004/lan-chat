@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import uvicorn
@@ -103,7 +103,7 @@ async def get():
     return HTMLResponse(content=html_content, status_code=200)
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), user_id: str = None):
+async def upload_file(file: UploadFile = File(...), user_id: str = Form(None)):
     # user_id is passed as form data from the client
     # Generate unique filename
     ext = os.path.splitext(file.filename)[1] if file.filename else ""
