@@ -738,13 +738,16 @@
             <span class="time">${time}</span>`;
         }
         // Wire up any download links inside this message
-               // Wire up any download links inside this message
         fileDiv.querySelectorAll('.dl-link').forEach(el => {
             el.addEventListener('click', (ev) => {
                 ev.preventDefault();
                 downloadFile(el.dataset.url, el.dataset.name);
             });
         });
+
+        // Actually add the message to the chat
+        messagesDiv.appendChild(fileDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     
