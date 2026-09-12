@@ -182,6 +182,44 @@ async def delete_image(image_id: str = Form(...), password: str = Form(...)):
     })
     return {"ok": True}
 
+
+@app.post("/delete-file")
+async def delete_file(url: str = Form(...), password: str = Form(...)):
+    """Delete a file by its /uploads/... URL. Also removes it from the board if present."""
+    if password != PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not url.startswith("/uploads/"):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+
+    filename = url[len("/uploads/"):]
+    # Prevent path traversal
+    if "/" in filename or ".." in filename or filename == "":
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print("Failed to delete file:", e)
+
+    # If it was on the board, remove it
+    store = load_images()
+    store["images"] = [i for i in store["images"] if i["id"] != filename]
+    if store["featured_id"] == filename:
+        store["featured_id"] = None
+    save_images(store)
+
+    await manager.broadcast({
+        "type": "file_deleted",
+        "url": url,
+        "image_id": filename,
+        "featured_id": store["featured_id"],
+    })
+    return {"ok": True}
+
+
 @app.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),

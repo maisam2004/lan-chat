@@ -94,11 +94,19 @@
         display: inline-block;
         margin-top: 4px;
         }
-    .file-message .private-badge {
-        color: #dc3545;
-        font-size: 0.85em;
-        font-weight: bold;
-        }
+    .file-message .del-file-btn {
+    background: transparent;
+    color: #dc3545;
+    border: none;
+    padding: 2px 6px;
+    font-size: 0.9em;
+    cursor: pointer;
+    margin-left: 4px;
+    border-radius: 3px;
+    }
+.file-message .del-file-btn:hover {
+    background: #f8d7da;
+    }
 
     button {
       padding: 8px 15px;
@@ -145,6 +153,8 @@
       justify-content: center;
       z-index: 2000;
     }
+   
+
     #loginBox {
       background: white;
       padding: 25px;
@@ -547,6 +557,19 @@
             renderBoard();
             if (lightboxImageId === data.image_id) closeLightbox();
             break;
+        case 'file_deleted':
+            // Remove any chat messages referencing this URL
+            document.querySelectorAll('.file-message').forEach(el => {
+                if (el.dataset.url === data.url) el.remove();
+            });
+            // If it was on the board, remove it there too
+            if (data.image_id) {
+                boardImages = boardImages.filter(i => i.id !== data.image_id);
+                featuredId = data.featured_id;
+                renderBoard();
+                if (lightboxImageId === data.image_id) closeLightbox();
+            }
+            break;
 
         case 'call-request':    handleIncomingCall(data.from, data.fromUsername); break;
         case 'call-accept':     handleCallAccepted(data.from); break;
@@ -720,24 +743,27 @@
     });
 
     // ---------------- Chat and files ----------------
-    function handleFileMessage(data) {
+       function handleFileMessage(data) {
         const messagesDiv = document.getElementById('messages');
         const fileDiv = document.createElement('div');
         fileDiv.className = 'file-message';
+        fileDiv.dataset.url = data.url;
         const time = new Date(data.timestamp).toLocaleTimeString();
         const badge = data.private ? '<span class="private-badge">[private]</span> ' : '';
+        const delBtn = `<button class="del-file-btn" data-url="${data.url}" title="Delete file from server">🗑</button>`;
 
         if (data.content_type && data.content_type.startsWith('image/')) {
-            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared an image<br>
+            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared an image${delBtn}<br>
             <img src="${data.url}" alt="${escapeHtml(data.filename)}" />
             <br><a class="dl-link" href="#" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">⬇ Download</a>
             <span class="time">${time}</span>`;
         } else {
-            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared a file:
+            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared a file:${delBtn}
             <a href="#" class="dl-link" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>
             <span class="time">${time}</span>`;
         }
-        // Wire up any download links inside this message
+
+        // Wire up download links
         fileDiv.querySelectorAll('.dl-link').forEach(el => {
             el.addEventListener('click', (ev) => {
                 ev.preventDefault();
@@ -745,7 +771,23 @@
             });
         });
 
-        // Actually add the message to the chat
+        // Wire up delete button
+        fileDiv.querySelectorAll('.del-file-btn').forEach(el => {
+            el.addEventListener('click', async (ev) => {
+                ev.preventDefault();
+                if (!confirm('Delete this file from the server? This cannot be undone.')) return;
+                if (!authPassword) return;
+                const fd = new FormData();
+                fd.append('url', el.dataset.url);
+                fd.append('password', authPassword);
+                try {
+                    const resp = await fetch('/delete-file', { method: 'POST', body: fd });
+                    if (resp.status === 401) alert('Wrong password.');
+                    // On success, the server broadcasts file_deleted; all clients update.
+                } catch (e) { console.error(e); }
+            });
+        });
+
         messagesDiv.appendChild(fileDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
