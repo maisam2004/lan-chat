@@ -1,0 +1,20 @@
+[Unit]
+Description=LAN Chat FastAPI server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/lan-chat
+EnvironmentFile=/root/lan-chat/lan-chat.env
+ExecStart=/root/lan-chat/venv/bin/python -m uvicorn main:app \
+  --host 0.0.0.0 --port 443 \
+  --ssl-keyfile /root/lan-chat/key.pem \
+  --ssl-certfile /root/lan-chat/cert.pem
+Restart=always
+RestartSec=3
+StandardOutput=append:/root/lan-chat/server.log
+StandardError=append:/root/lan-chat/server.log
+
+[Install]
+WantedBy=multi-user.target
