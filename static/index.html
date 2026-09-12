@@ -641,18 +641,20 @@
       lbImg.src = '';
     }
 
+    document.getElementById('lbDownloadBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (lightboxImageId) {
+            const img = boardImages.find(i => i.id === lightboxImageId);
+            if (img) downloadFile(img.url, img.filename);
+        }
+        });
+
     document.getElementById('lbCloseBtn').addEventListener('click', closeLightbox);
     lightbox.addEventListener('click', (e) => {
       if (e.target === lightbox) closeLightbox();
     });
 
-    document.getElementById('lbDownloadBtn').addEventListener('click', (e) => {
-  e.preventDefault();
-  if (lightboxImageId) {
-    const img = boardImages.find(i => i.id === lightboxImageId);
-    if (img) downloadFile(img.url, img.filename);
-  }
-});
+    
 
     document.getElementById('lbDeleteBtn').addEventListener('click', async () => {
         if (!lightboxImageId || !authPassword) return;
