@@ -151,11 +151,43 @@ async def feature_image(image_id: str = Form(...), password: str = Form(...)):
     return {"featured_id": store["featured_id"]}
 
 
+@app.post("/delete")
+async def delete_image(image_id: str = Form(...), password: str = Form(...)):
+    """Delete a board image: file on disk + entry in images.json + broadcast."""
+    if password != PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    store = load_images()
+    if not any(img["id"] == image_id for img in store["images"]):
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # Remove the file from disk (best-effort)
+    file_path = os.path.join(UPLOAD_DIR, image_id)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print("Failed to delete file:", e)
+
+    # Remove from the store
+    store["images"] = [i for i in store["images"] if i["id"] != image_id]
+    if store["featured_id"] == image_id:
+        store["featured_id"] = None
+    save_images(store)
+
+    await manager.broadcast({
+        "type": "image_deleted",
+        "image_id": image_id,
+        "featured_id": store["featured_id"],
+    })
+    return {"ok": True}
+
 @app.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
     user_id: str = Form(None),
     password: str = Form(None),
+    target_id: str = Form(None),
 ):
     if password != PASSWORD:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -169,24 +201,43 @@ async def upload_file(
 
     content_type = file.content_type or "application/octet-stream"
     file_url = f"/uploads/{unique_name}"
+    sender_name = manager.usernames.get(user_id, "Unknown") if user_id else "Unknown"
 
-    # Broadcast to chat
-    if user_id and user_id in manager.active_connections:
-        await manager.broadcast_file(user_id, file.filename, file_url, content_type)
+    file_message = {
+        "type": "file",
+        "username": sender_name,
+        "filename": file.filename,
+        "url": file_url,
+        "content_type": content_type,
+        "timestamp": int(time.time() * 1000),
+        "private": False,
+    }
 
-    # If it's an image, also add to the board
-    if content_type.startswith("image/"):
-        store = load_images()
-        image_entry = {
-            "id": unique_name,
-            "filename": file.filename,
-            "url": file_url,
-            "uploader": manager.usernames.get(user_id, "Unknown") if user_id else "Unknown",
-            "timestamp": int(time.time() * 1000),
-        }
-        store["images"].insert(0, image_entry)  # newest first
-        save_images(store)
-        await manager.broadcast({"type": "image_added", "image": image_entry})
+    if target_id:
+        # ---- Private send: to the target and back to the sender only ----
+        file_message["private"] = True
+        if target_id in manager.active_connections:
+            await manager.send_to_user(target_id, file_message)
+        if user_id and user_id in manager.active_connections:
+            await manager.send_to_user(user_id, file_message)
+        # Note: private files do NOT go to the board.
+    else:
+        # ---- Public broadcast + board ----
+        if user_id and user_id in manager.active_connections:
+            await manager.broadcast_file(user_id, file.filename, file_url, content_type)
+
+        if content_type.startswith("image/"):
+            store = load_images()
+            image_entry = {
+                "id": unique_name,
+                "filename": file.filename,
+                "url": file_url,
+                "uploader": sender_name,
+                "timestamp": int(time.time() * 1000),
+            }
+            store["images"].insert(0, image_entry)
+            save_images(store)
+            await manager.broadcast({"type": "image_added", "image": image_entry})
 
     return {"url": file_url, "filename": file.filename}
 

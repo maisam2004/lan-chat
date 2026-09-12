@@ -80,6 +80,25 @@
     .file-message img { max-width: 100%; border-radius: 5px; }
     #inputArea, #fileArea { display: flex; gap: 5px; margin-bottom: 8px; }
     #messageInput, #fileInput { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+    #targetSelect {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: white;
+        max-width: 130px;
+        }
+    .file-message .dl-link {
+        font-size: 0.85em;
+        color: #007bff;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 4px;
+        }
+    .file-message .private-badge {
+        color: #dc3545;
+        font-size: 0.85em;
+        font-weight: bold;
+        }
 
     button {
       padding: 8px 15px;
@@ -302,8 +321,11 @@
       <button id="sendButton">Send</button>
     </div>
     <div id="fileArea">
-      <input type="file" id="fileInput" />
-      <button id="uploadButton">Upload</button>
+    <select id="targetSelect" title="Send to...">
+        <option value="">Everyone</option>
+    </select>
+        <input type="file" id="fileInput" />
+        <button id="uploadButton">Upload</button>
     </div>
   </div>
 
@@ -340,9 +362,11 @@
       <img id="lbImg" src="" alt="" />
       <div class="lb-info" id="lbInfo"></div>
       <div class="lb-actions">
-        <button class="lb-feature" id="lbFeatureBtn">Set as Featured</button>
-        <button class="lb-close" id="lbCloseBtn">Close</button>
-      </div>
+            <button class="lb-feature" id="lbFeatureBtn">Set as Featured</button>
+            <a class="lb-feature" id="lbDownloadBtn" download style="background:#007bff;color:white;text-decoration:none;padding:8px 15px;border-radius:5px;">Download</a>
+            <button class="lb-delete" id="lbDeleteBtn" style="background:#dc3545;">Delete</button>
+            <button class="lb-close" id="lbCloseBtn">Close</button>
+        </div>
     </div>
   </div>
 
@@ -517,6 +541,12 @@
           featuredId = data.featured_id;
           renderBoard();
           break;
+        case 'image_deleted':
+            boardImages = boardImages.filter(i => i.id !== data.image_id);
+            featuredId = data.featured_id;
+            renderBoard();
+            if (lightboxImageId === data.image_id) closeLightbox();
+            break;
 
         case 'call-request':    handleIncomingCall(data.from, data.fromUsername); break;
         case 'call-accept':     handleCallAccepted(data.from); break;
@@ -589,16 +619,21 @@
     const lbFeatureBtn = document.getElementById('lbFeatureBtn');
 
     function openLightbox(id) {
-      const img = boardImages.find(i => i.id === id);
-      if (!img) return;
-      lightboxImageId = id;
-      lbImg.src = img.url;
-      lbImg.alt = img.filename;
-      const time = new Date(img.timestamp).toLocaleString();
-      lbInfo.textContent = `${img.uploader} • ${time}`;
-      lbFeatureBtn.textContent = (id === featuredId) ? 'Unfeature' : 'Set as Featured';
-      lightbox.style.display = 'flex';
-    }
+        const img = boardImages.find(i => i.id === id);
+        if (!img) return;
+        lightboxImageId = id;
+        lbImg.src = img.url;
+        lbImg.alt = img.filename;
+        const time = new Date(img.timestamp).toLocaleString();
+        lbInfo.textContent = `${img.uploader} • ${time}`;
+        lbFeatureBtn.textContent = (id === featuredId) ? 'Unfeature' : 'Set as Featured';
+
+        const dl = document.getElementById('lbDownloadBtn');
+        dl.href = img.url;
+        dl.setAttribute('download', img.filename);
+
+        lightbox.style.display = 'flex';
+        }
     function closeLightbox() {
       lightbox.style.display = 'none';
       lightboxImageId = null;
@@ -609,6 +644,25 @@
     lightbox.addEventListener('click', (e) => {
       if (e.target === lightbox) closeLightbox();
     });
+
+    document.getElementById('lbDeleteBtn').addEventListener('click', async () => {
+        if (!lightboxImageId || !authPassword) return;
+        if (!confirm('Delete this image permanently?')) return;
+        const fd = new FormData();
+        fd.append('image_id', lightboxImageId);
+        fd.append('password', authPassword);
+        try {
+            const resp = await fetch('/delete', { method: 'POST', body: fd });
+            if (resp.ok) {
+            // server broadcasts image_deleted, board updates automatically
+            closeLightbox();
+            } else if (resp.status === 401) {
+            alert('Wrong password.');
+            } else {
+            alert('Delete failed: ' + resp.status);
+            }
+        } catch (e) { console.error(e); }
+        });
 
     lbFeatureBtn.addEventListener('click', async () => {
       if (!lightboxImageId || !authPassword) return;
@@ -656,38 +710,54 @@
 
     // ---------------- Chat and files ----------------
     function handleFileMessage(data) {
-      const messagesDiv = document.getElementById('messages');
-      const fileDiv = document.createElement('div');
-      fileDiv.className = 'file-message';
-      const time = new Date(data.timestamp).toLocaleTimeString();
+        const messagesDiv = document.getElementById('messages');
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'file-message';
+        const time = new Date(data.timestamp).toLocaleTimeString();
+        const badge = data.private ? '<span class="private-badge">[private]</span> ' : '';
 
-      if (data.content_type && data.content_type.startsWith('image/')) {
-        fileDiv.innerHTML = `<strong>${data.username}:</strong> shared an image<br>
-          <img src="${data.url}" alt="${escapeHtml(data.filename)}" /> <span class="time">${time}</span>`;
-      } else {
-        fileDiv.innerHTML = `<strong>${data.username}:</strong> shared a file:
-          <a href="${data.url}" download="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>
-          <span class="time">${time}</span>`;
-      }
-      messagesDiv.appendChild(fileDiv);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
+        if (data.content_type && data.content_type.startsWith('image/')) {
+            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared an image<br>
+            <img src="${data.url}" alt="${escapeHtml(data.filename)}" />
+            <br><a class="dl-link" href="${data.url}" download="${escapeHtml(data.filename)}">⬇ Download</a>
+            <span class="time">${time}</span>`;
+        } else {
+            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared a file:
+            <a href="${data.url}" download="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>
+            <span class="time">${time}</span>`;
+        }
+        messagesDiv.appendChild(fileDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
 
-    function updateUserList(users) {
-      const userlistDiv = document.getElementById('userlist');
-      let html = 'Online: ';
-      users.forEach(user => {
-        html += `<div class="user-item">
-          <span>${user.username}</span>
-          ${user.id !== myId ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
-        </div>`;
-      });
-      userlistDiv.innerHTML = html;
+   function updateUserList(users) {
+        const userlistDiv = document.getElementById('userlist');
+        let html = 'Online: ';
+        users.forEach(user => {
+            html += `<div class="user-item">
+            <span>${user.username}</span>
+            ${user.id !== myId ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
+            </div>`;
+        });
+        userlistDiv.innerHTML = html;
 
-      document.querySelectorAll('.call-btn').forEach(btn => {
-        btn.addEventListener('click', () => startCall(btn.getAttribute('data-id')));
-      });
-    }
+        document.querySelectorAll('.call-btn').forEach(btn => {
+            btn.addEventListener('click', () => startCall(btn.getAttribute('data-id')));
+        });
+
+        // Rebuild the "Send to" dropdown, preserving the previous selection if still valid
+        const sel = document.getElementById('targetSelect');
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">Everyone</option>';
+        users.forEach(user => {
+            if (user.id === myId) return;
+            const opt = document.createElement('option');
+            opt.value = user.id;
+            opt.textContent = user.username;
+            sel.appendChild(opt);
+        });
+        if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+        }
 
     function sendMessage() {
       const input = document.getElementById('messageInput');
@@ -699,15 +769,17 @@
     }
 
     async function uploadFile() {
-      const fileInput = document.getElementById('fileInput');
-      const file = fileInput.files[0];
-      if (!file) { alert('Please select a file first.'); return; }
-      if (!authPassword) { alert('Not authenticated.'); return; }
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) { alert('Please select a file first.'); return; }
+        if (!authPassword) { alert('Not authenticated.'); return; }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('password', authPassword);
-      if (myId) formData.append('user_id', myId);
+        const targetId = document.getElementById('targetSelect').value;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('password', authPassword);
+        if (myId) formData.append('user_id', myId);
+        if (targetId) formData.append('target_id', targetId);
 
       try {
         const response = await fetch('/upload', { method: 'POST', body: formData });
