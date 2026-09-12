@@ -12,33 +12,18 @@ from typing import Dict
 
 app = FastAPI()
 
+# ---------------------------------------------------------------------------
+# Password gate. Set the environment variable LAN_CHAT_PASSWORD before start.
+#   LAN_CHAT_PASSWORD=mypassword nohup python -m uvicorn ...
+# If not set, the default below is used.
+# ---------------------------------------------------------------------------
 PASSWORD = os.environ.get("LAN_CHAT_PASSWORD", "changeme123")
 
 UPLOAD_DIR = "uploads"
-IMAGES_FILE = os.path.join(UPLOAD_DIR, "images.json")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-
-# ---------------- Image board storage (simple JSON file) ----------------
-def load_images() -> dict:
-    if not os.path.exists(IMAGES_FILE):
-        return {"images": [], "featured_id": None}
-    try:
-        with open(IMAGES_FILE, "r") as f:
-            data = json.load(f)
-            data.setdefault("images", [])
-            data.setdefault("featured_id", None)
-            return data
-    except Exception:
-        return {"images": [], "featured_id": None}
-
-
-def save_images(data: dict):
-    with open(IMAGES_FILE, "w") as f:
-        json.dump(data, f, indent=2)
 
 
 class ConnectionManager:
@@ -50,6 +35,7 @@ class ConnectionManager:
         return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
     async def connect(self, websocket: WebSocket) -> str:
+        """Register an already-accepted WebSocket. Returns the new user_id."""
         user_id = self.generate_id()
         username = f"User-{random.randint(1000, 9999)}"
         self.active_connections[user_id] = websocket
@@ -124,39 +110,13 @@ async def get():
     return HTMLResponse(content=html_content, status_code=200)
 
 
-@app.get("/images")
-async def get_images():
-    """Return the full image board state."""
-    return load_images()
-
-
-@app.post("/feature")
-async def feature_image(image_id: str = Form(...), password: str = Form(...)):
-    """Toggle the featured image. Same password as everything else."""
-    if password != PASSWORD:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    store = load_images()
-    # Toggle: if same image was featured, unfeature it. Otherwise feature it.
-    if store["featured_id"] == image_id:
-        store["featured_id"] = None
-    else:
-        # Make sure the id actually exists
-        if not any(img["id"] == image_id for img in store["images"]):
-            raise HTTPException(status_code=404, detail="Image not found")
-        store["featured_id"] = image_id
-
-    save_images(store)
-    await manager.broadcast({"type": "image_featured", "featured_id": store["featured_id"]})
-    return {"featured_id": store["featured_id"]}
-
-
 @app.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
     user_id: str = Form(None),
     password: str = Form(None),
 ):
+    # Password check
     if password != PASSWORD:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -170,23 +130,8 @@ async def upload_file(
     content_type = file.content_type or "application/octet-stream"
     file_url = f"/uploads/{unique_name}"
 
-    # Broadcast to chat
     if user_id and user_id in manager.active_connections:
         await manager.broadcast_file(user_id, file.filename, file_url, content_type)
-
-    # If it's an image, also add to the board
-    if content_type.startswith("image/"):
-        store = load_images()
-        image_entry = {
-            "id": unique_name,
-            "filename": file.filename,
-            "url": file_url,
-            "uploader": manager.usernames.get(user_id, "Unknown") if user_id else "Unknown",
-            "timestamp": int(time.time() * 1000),
-        }
-        store["images"].insert(0, image_entry)  # newest first
-        save_images(store)
-        await manager.broadcast({"type": "image_added", "image": image_entry})
 
     return {"url": file_url, "filename": file.filename}
 
@@ -195,7 +140,7 @@ async def upload_file(
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
-    # ---- Auth: first message must be {"type":"auth","password":"..."} ----
+    # ----- Auth: first message must be {"type":"auth","password":"..."} -----
     try:
         raw = await websocket.receive_text()
         first = json.loads(raw)
@@ -207,6 +152,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008, reason="Unauthorized")
         return
 
+    # ----- Auth OK: register with the manager -----
     user_id = await manager.connect(websocket)
 
     try:

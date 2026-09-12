@@ -3,52 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LAN Chat</title>
+  <title>LAN Chat + Voice + Files</title>
   <style>
-    * { box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 10px;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 10px;
       background: #f5f5f5;
     }
-    h1 { color: #333; text-align: center; margin: 10px 0; font-size: 1.3em; }
-
-    /* Tabs */
-    .tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 10px;
-      border-bottom: 2px solid #ddd;
-    }
-    .tab {
-      flex: 1;
-      padding: 10px;
-      background: transparent;
-      border: none;
-      border-bottom: 3px solid transparent;
-      color: #666;
-      font-size: 1em;
-      cursor: pointer;
-      border-radius: 0;
-    }
-    .tab.active {
-      color: #007bff;
-      border-bottom-color: #007bff;
-      font-weight: bold;
-    }
-    .panel { display: none; }
-    .panel.active { display: block; }
-
-    /* Chat */
+    h1 { color: #333; text-align: center; }
     #userlist {
       border: 1px solid #ccc;
       background: white;
       padding: 10px;
       margin-bottom: 10px;
       border-radius: 5px;
-      font-size: 0.95em;
     }
     .user-item {
       display: flex;
@@ -64,8 +34,9 @@
       border-radius: 3px;
       cursor: pointer;
     }
+    .call-btn:disabled { background: #aaa; cursor: not-allowed; }
     #messages {
-      height: 300px;
+      height: 250px;
       overflow-y: auto;
       border: 1px solid #ccc;
       background: white;
@@ -78,9 +49,10 @@
     .system { color: #888; font-style: italic; }
     .file-message { margin: 5px 0; }
     .file-message img { max-width: 100%; border-radius: 5px; }
-    #inputArea, #fileArea { display: flex; gap: 5px; margin-bottom: 8px; }
-    #messageInput, #fileInput { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-
+    #inputArea { display: flex; gap: 5px; margin-bottom: 10px; }
+    #messageInput { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+    #fileArea { display: flex; gap: 5px; margin-bottom: 10px; }
+    #fileInput { flex: 1; padding: 5px; }
     button {
       padding: 8px 15px;
       border: none;
@@ -90,8 +62,6 @@
       cursor: pointer;
     }
     button:disabled { background: #aaa; cursor: not-allowed; }
-
-    /* Call status */
     #callStatus {
       margin: 10px 0;
       padding: 10px;
@@ -102,7 +72,6 @@
     #callControls { display: flex; gap: 10px; margin-top: 10px; }
     #muteBtn { background: #ffc107; }
     #hangupBtn { background: #dc3545; }
-
     #incomingCall {
       position: fixed;
       top: 50%; left: 50%;
@@ -115,8 +84,7 @@
       display: none;
       z-index: 1000;
     }
-
-    /* Login */
+    /* Login overlay */
     #loginOverlay {
       position: fixed;
       inset: 0;
@@ -140,143 +108,15 @@
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 5px;
+      box-sizing: border-box;
       margin-bottom: 10px;
       font-size: 16px;
     }
     #loginButton { width: 100%; }
     #loginError { color: #dc3545; font-size: 0.9em; margin: 8px 0 0 0; min-height: 1em; }
-
-    /* Board */
-    #featuredArea {
-      margin-bottom: 10px;
-    }
-    #featuredArea .featured-card {
-      position: relative;
-      border-radius: 8px;
-      overflow: hidden;
-      background: black;
-    }
-    #featuredArea img {
-      width: 100%;
-      max-height: 45vh;
-      object-fit: contain;
-      background: #000;
-      display: block;
-    }
-    #featuredArea .featured-label {
-      position: absolute;
-      top: 8px; left: 8px;
-      background: rgba(0,0,0,0.65);
-      color: white;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.8em;
-    }
-    .board-controls {
-      display: flex;
-      gap: 5px;
-      margin-bottom: 10px;
-      align-items: center;
-    }
-    .board-controls input[type="file"] {
-      flex: 1;
-      padding: 6px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-    #imageGrid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-      gap: 6px;
-    }
-    .thumb {
-      position: relative;
-      padding-bottom: 100%; /* square */
-      overflow: hidden;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #eee;
-    }
-    .thumb img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .thumb .uploader-tag {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-      color: white;
-      font-size: 0.7em;
-      padding: 14px 6px 4px 6px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .thumb.featured::after {
-      content: '★';
-      position: absolute;
-      top: 4px; right: 6px;
-      color: #ffd700;
-      font-size: 1.2em;
-      text-shadow: 0 0 4px black;
-    }
-
-    /* Lightbox */
-    #lightbox {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.9);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1500;
-      padding: 15px;
-    }
-    #lightbox .lb-inner {
-      max-width: 100%;
-      max-height: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: center;
-    }
-    #lightbox img {
-      max-width: 100%;
-      max-height: 75vh;
-      object-fit: contain;
-      border-radius: 4px;
-    }
-    #lightbox .lb-info {
-      color: white;
-      font-size: 0.9em;
-      text-align: center;
-    }
-    #lightbox .lb-actions {
-      display: flex;
-      gap: 10px;
-    }
-    #lightbox .lb-close {
-      background: #dc3545;
-    }
-    #lightbox .lb-feature {
-      background: #ffc107;
-      color: #333;
-    }
-
-    #emptyBoard {
-      text-align: center;
-      color: #888;
-      padding: 30px 10px;
-      font-style: italic;
-    }
   </style>
 </head>
 <body>
-  <!-- Login overlay -->
   <div id="loginOverlay">
     <div id="loginBox">
       <h2>Enter Password</h2>
@@ -286,39 +126,18 @@
     </div>
   </div>
 
-  <h1>LAN Hub</h1>
-
-  <div class="tabs">
-    <button class="tab active" data-tab="chat">💬 Chat</button>
-    <button class="tab" data-tab="board">🖼 Board</button>
+  <h1>LAN Chat + Voice + Files</h1>
+  <div id="userlist">Online: </div>
+  <div id="messages"></div>
+  <div id="inputArea">
+    <input type="text" id="messageInput" placeholder="Type a message..." />
+    <button id="sendButton">Send</button>
+  </div>
+  <div id="fileArea">
+    <input type="file" id="fileInput" />
+    <button id="uploadButton">Upload</button>
   </div>
 
-  <!-- Chat panel -->
-  <div id="chatPanel" class="panel active">
-    <div id="userlist">Online: </div>
-    <div id="messages"></div>
-    <div id="inputArea">
-      <input type="text" id="messageInput" placeholder="Type a message..." />
-      <button id="sendButton">Send</button>
-    </div>
-    <div id="fileArea">
-      <input type="file" id="fileInput" />
-      <button id="uploadButton">Upload</button>
-    </div>
-  </div>
-
-  <!-- Board panel -->
-  <div id="boardPanel" class="panel">
-    <div id="featuredArea"></div>
-    <div class="board-controls">
-      <input type="file" id="boardFileInput" accept="image/*" />
-      <button id="boardUploadBtn">Add to Board</button>
-    </div>
-    <div id="emptyBoard">No images yet. Be the first to add one.</div>
-    <div id="imageGrid"></div>
-  </div>
-
-  <!-- Call status -->
   <div id="callStatus">
     <span id="callStatusText">In call</span>
     <div id="callControls">
@@ -327,38 +146,18 @@
     </div>
   </div>
 
-  <!-- Incoming call dialog -->
   <div id="incomingCall">
     <p><strong id="incomingCallUser"></strong> is calling you...</p>
     <button id="acceptCallBtn" style="background:#28a745;">Accept</button>
     <button id="rejectCallBtn" style="background:#dc3545;">Reject</button>
   </div>
-
-  <!-- Lightbox -->
-  <div id="lightbox">
-    <div class="lb-inner">
-      <img id="lbImg" src="" alt="" />
-      <div class="lb-info" id="lbInfo"></div>
-      <div class="lb-actions">
-        <button class="lb-feature" id="lbFeatureBtn">Set as Featured</button>
-        <button class="lb-close" id="lbCloseBtn">Close</button>
-      </div>
-    </div>
-  </div>
-
   <audio id="remoteAudio" autoplay playsinline></audio>
-
   <script>
     let ws;
     let myId = null;
     let myUsername = null;
     let authPassword = sessionStorage.getItem('lanChatPassword');
     let reconnectTimer = null;
-
-    // Board state (kept client-side)
-    let boardImages = [];      // newest first
-    let featuredId = null;
-    let lightboxImageId = null;
 
     // ---------------- Login ----------------
     const loginOverlay = document.getElementById('loginOverlay');
@@ -387,19 +186,7 @@
       if (e.key === 'Enter') document.getElementById('loginButton').click();
     });
 
-    // ---------------- Tabs ----------------
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById(tab.dataset.tab + 'Panel').classList.add('active');
-        // When switching to board, make sure we have fresh data
-        if (tab.dataset.tab === 'board') loadBoardFromServer();
-      });
-    });
-
-    // ---------------- Ringtone ----------------
+    // ---------------- Ringtone (Web Audio) ----------------
     let ringtoneCtx = null;
     let ringtoneTimer = null;
 
@@ -423,14 +210,17 @@
         };
         beep();
         ringtoneTimer = setInterval(beep, 1200);
-      } catch (e) { console.log('Ringtone error:', e); }
+      } catch (e) {
+        console.log('Ringtone error:', e);
+      }
     }
+
     function stopRingtone() {
       if (ringtoneTimer) { clearInterval(ringtoneTimer); ringtoneTimer = null; }
       if (ringtoneCtx) { ringtoneCtx.close().catch(() => {}); ringtoneCtx = null; }
     }
 
-    // ---------------- Mic warm-up ----------------
+    // ---------------- Proactive mic permission ----------------
     async function warmUpMicrophone() {
       try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -477,8 +267,6 @@
           myId = data.id;
           myUsername = data.username;
           console.log('My ID:', myId, 'Username:', myUsername);
-          // Load the image board after we're connected
-          loadBoardFromServer();
           break;
 
         case 'userlist':
@@ -508,16 +296,6 @@
           break;
         }
 
-        case 'image_added':
-          boardImages.unshift(data.image);
-          renderBoard();
-          break;
-
-        case 'image_featured':
-          featuredId = data.featured_id;
-          renderBoard();
-          break;
-
         case 'call-request':    handleIncomingCall(data.from, data.fromUsername); break;
         case 'call-accept':     handleCallAccepted(data.from); break;
         case 'call-reject':     handleCallRejected(); break;
@@ -528,133 +306,6 @@
       }
     }
 
-    // ---------------- Board ----------------
-    async function loadBoardFromServer() {
-      try {
-        const resp = await fetch('/images', { cache: 'no-store' });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        boardImages = data.images || [];
-        featuredId = data.featured_id;
-        renderBoard();
-      } catch (e) {
-        console.warn('Failed to load board:', e);
-      }
-    }
-
-    function renderBoard() {
-      // Featured
-      const featuredArea = document.getElementById('featuredArea');
-      if (featuredId) {
-        const feat = boardImages.find(i => i.id === featuredId);
-        if (feat) {
-          featuredArea.innerHTML = `
-            <div class="featured-card">
-              <span class="featured-label">★ Featured by ${escapeHtml(feat.uploader)}</span>
-              <img src="${feat.url}" alt="${escapeHtml(feat.filename)}" data-id="${feat.id}" class="featured-img" />
-            </div>`;
-          featuredArea.querySelector('img').addEventListener('click', () => openLightbox(feat.id));
-        } else {
-          featuredArea.innerHTML = '';
-        }
-      } else {
-        featuredArea.innerHTML = '';
-      }
-
-      // Grid
-      const grid = document.getElementById('imageGrid');
-      const empty = document.getElementById('emptyBoard');
-      if (boardImages.length === 0) {
-        grid.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-      }
-      empty.style.display = 'none';
-      grid.innerHTML = boardImages.map(img => `
-        <div class="thumb ${img.id === featuredId ? 'featured' : ''}" data-id="${img.id}">
-          <img src="${img.url}" alt="${escapeHtml(img.filename)}" loading="lazy" />
-          <div class="uploader-tag">${escapeHtml(img.uploader)}</div>
-        </div>
-      `).join('');
-
-      grid.querySelectorAll('.thumb').forEach(el => {
-        el.addEventListener('click', () => openLightbox(el.dataset.id));
-      });
-    }
-
-    // Lightbox
-    const lightbox = document.getElementById('lightbox');
-    const lbImg = document.getElementById('lbImg');
-    const lbInfo = document.getElementById('lbInfo');
-    const lbFeatureBtn = document.getElementById('lbFeatureBtn');
-
-    function openLightbox(id) {
-      const img = boardImages.find(i => i.id === id);
-      if (!img) return;
-      lightboxImageId = id;
-      lbImg.src = img.url;
-      lbImg.alt = img.filename;
-      const time = new Date(img.timestamp).toLocaleString();
-      lbInfo.textContent = `${img.uploader} • ${time}`;
-      lbFeatureBtn.textContent = (id === featuredId) ? 'Unfeature' : 'Set as Featured';
-      lightbox.style.display = 'flex';
-    }
-    function closeLightbox() {
-      lightbox.style.display = 'none';
-      lightboxImageId = null;
-      lbImg.src = '';
-    }
-
-    document.getElementById('lbCloseBtn').addEventListener('click', closeLightbox);
-    lightbox.addEventListener('click', (e) => {
-      if (e.target === lightbox) closeLightbox();
-    });
-
-    lbFeatureBtn.addEventListener('click', async () => {
-      if (!lightboxImageId || !authPassword) return;
-      const fd = new FormData();
-      fd.append('image_id', lightboxImageId);
-      fd.append('password', authPassword);
-      try {
-        const resp = await fetch('/feature', { method: 'POST', body: fd });
-        if (resp.ok) {
-          const data = await resp.json();
-          featuredId = data.featured_id;
-          renderBoard();
-          closeLightbox();
-        } else if (resp.status === 401) {
-          alert('Wrong password.');
-        }
-      } catch (e) { console.error(e); }
-    });
-
-    // Board upload
-    document.getElementById('boardUploadBtn').addEventListener('click', async () => {
-      const input = document.getElementById('boardFileInput');
-      const file = input.files[0];
-      if (!file) { alert('Choose an image first.'); return; }
-      if (!file.type.startsWith('image/')) { alert('Only images allowed on the board.'); return; }
-      if (!authPassword) { alert('Not authenticated.'); return; }
-
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('password', authPassword);
-      if (myId) fd.append('user_id', myId);
-
-      try {
-        const resp = await fetch('/upload', { method: 'POST', body: fd });
-        if (resp.ok) {
-          input.value = '';
-          // The server broadcasts image_added, so the board updates automatically.
-        } else if (resp.status === 401) {
-          alert('Wrong password.');
-        } else {
-          alert('Upload failed: ' + resp.status);
-        }
-      } catch (e) { console.error(e); }
-    });
-
-    // ---------------- Chat and files ----------------
     function handleFileMessage(data) {
       const messagesDiv = document.getElementById('messages');
       const fileDiv = document.createElement('div');
@@ -712,11 +363,16 @@
       try {
         const response = await fetch('/upload', { method: 'POST', body: formData });
         if (response.ok) {
+          console.log('File uploaded successfully');
           fileInput.value = '';
         } else if (response.status === 401) {
-          alert('Upload rejected: wrong password.');
+          alert('Upload rejected: wrong password. Reload the page and log in again.');
+        } else {
+          console.error('Upload failed:', response.status);
         }
-      } catch (err) { console.error('Upload error:', err); }
+      } catch (err) {
+        console.error('Upload error:', err);
+      }
     }
 
     function escapeHtml(text) {
@@ -725,7 +381,7 @@
       return div.innerHTML;
     }
 
-    // ---------------- WebRTC (unchanged) ----------------
+    // ---------------- WebRTC ----------------
     let localStream = null;
     let peerConnection = null;
     let currentCallPartnerId = null;
@@ -838,12 +494,15 @@
           { urls: 'stun:stun1.l.google.com:19302' }
         ]
       });
+
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
       peerConnection.ontrack = (event) => {
         const remoteAudio = document.getElementById('remoteAudio');
         remoteAudio.srcObject = event.streams[0];
         remoteAudio.play().catch(e => console.log('Playback error:', e));
       };
+
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
           ws.send(JSON.stringify({
@@ -853,8 +512,14 @@
           }));
         }
       };
-      peerConnection.onconnectionstatechange = () => console.log('Connection state:', peerConnection.connectionState);
-      peerConnection.oniceconnectionstatechange = () => console.log('ICE state:', peerConnection.iceConnectionState);
+
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', peerConnection.connectionState);
+      };
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE state:', peerConnection.iceConnectionState);
+      };
+
       return peerConnection;
     }
 
