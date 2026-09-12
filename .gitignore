@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+uploads/
+server.log
+*.log
+key.pem
+cert.pem
+lan-chat.env
+.env
+.DS_Store
