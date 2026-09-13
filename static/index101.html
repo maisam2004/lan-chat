@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAN Chat</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 10px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; text-align: center; margin: 10px 0; font-size: 1.3em; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #ddd;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: #666;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 0;
+    }
+    .tab.active {
+      color: #007bff;
+      border-bottom-color: #007bff;
+      font-weight: bold;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Chat */
+    #userlist {
+      border: 1px solid #ccc;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      font-size: 0.95em;
+    }
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 5px 0;
+    }
+    .call-btn {
+      background: #28a745;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    #messages {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .message { margin: 5px 0; }
+    .message .time { color: #999; font-size: 0.8em; margin-left: 10px; }
+    .system { color: #888; font-style: italic; }
+    .file-message { margin: 5px 0; }
+    .file-message img { max-width: 100%; border-radius: 5px; }
+    #inputArea, #fileArea { display: flex; gap: 5px; margin-bottom: 8px; }
+    #messageInput, #fileInput { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+    #targetSelect {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: white;
+        max-width: 130px;
+        }
+    .file-message .dl-link {
+        font-size: 0.85em;
+        color: #007bff;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 4px;
+        }
+    .file-message .del-file-btn {
+    background: transparent;
+    color: #dc3545;
+    border: none;
+    padding: 2px 6px;
+    font-size: 0.9em;
+    cursor: pointer;
+    margin-left: 4px;
+    border-radius: 3px;
+    }
+.file-message .del-file-btn:hover {
+    background: #f8d7da;
+    }
+
+    button {
+      padding: 8px 15px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Call status */
+    #callStatus {
+      margin: 10px 0;
+      padding: 10px;
+      background: #e9f7ef;
+      border-radius: 5px;
+      display: none;
+    }
+    #callControls { display: flex; gap: 10px; margin-top: 10px; }
+    #muteBtn { background: #ffc107; }
+    #hangupBtn { background: #dc3545; }
+
+    #incomingCall {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 1000;
+    }
+
+    /* Login */
+    #loginOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+   
+
+    #loginBox {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      width: 280px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      text-align: center;
+    }
+    #loginBox h2 { margin: 0 0 15px 0; color: #333; }
+    #passwordInput {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    #loginButton { width: 100%; }
+    #loginError { color: #dc3545; font-size: 0.9em; margin: 8px 0 0 0; min-height: 1em; }
+
+    /* Board */
+    #featuredArea {
+      margin-bottom: 10px;
+    }
+    #featuredArea .featured-card {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      background: black;
+    }
+    #featuredArea img {
+      width: 100%;
+      max-height: 45vh;
+      object-fit: contain;
+      background: #000;
+      display: block;
+    }
+    #featuredArea .featured-label {
+      position: absolute;
+      top: 8px; left: 8px;
+      background: rgba(0,0,0,0.65);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8em;
+    }
+    .board-controls {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .board-controls input[type="file"] {
+      flex: 1;
+      padding: 6px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #imageGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 6px;
+    }
+    .thumb {
+      position: relative;
+      padding-bottom: 100%; /* square */
+      overflow: hidden;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #eee;
+    }
+    .thumb img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .thumb .uploader-tag {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+      color: white;
+      font-size: 0.7em;
+      padding: 14px 6px 4px 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .thumb.featured::after {
+      content: '★';
+      position: absolute;
+      top: 4px; right: 6px;
+      color: #ffd700;
+      font-size: 1.2em;
+      text-shadow: 0 0 4px black;
+    }
+
+    /* Lightbox */
+    #lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1500;
+      padding: 15px;
+    }
+    #lightbox .lb-inner {
+      max-width: 100%;
+      max-height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    #lightbox img {
+      max-width: 100%;
+      max-height: 75vh;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+    #lightbox .lb-info {
+      color: white;
+      font-size: 0.9em;
+      text-align: center;
+    }
+    #lightbox .lb-actions {
+      display: flex;
+      gap: 10px;
+    }
+    #lightbox .lb-close {
+      background: #dc3545;
+    }
+    #lightbox .lb-feature {
+      background: #ffc107;
+      color: #333;
+    }
+
+    #emptyBoard {
+      text-align: center;
+      color: #888;
+      padding: 30px 10px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <!-- Login overlay -->
+  <div id="loginOverlay">
+    <div id="loginBox">
+      <h2>Enter Password</h2>
+      <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" />
+      <button id="loginButton">Join</button>
+      <p id="loginError"></p>
+    </div>
+  </div>
+
+  <h1>LAN Hub</h1>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="chat">💬 Chat</button>
+    <button class="tab" data-tab="board">🖼 Board</button>
+  </div>
+
+  <!-- Chat panel -->
+  <div id="chatPanel" class="panel active">
+    <div id="userlist">Online: </div>
+    <div id="messages"></div>
+    <div id="inputArea">
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <button id="sendButton">Send</button>
+    </div>
+    <div id="fileArea">
+    <select id="targetSelect" title="Send to...">
+        <option value="">Everyone</option>
+    </select>
+        <input type="file" id="fileInput" />
+        <button id="uploadButton">Upload</button>
+    </div>
+  </div>
+
+  <!-- Board panel -->
+  <div id="boardPanel" class="panel">
+    <div id="featuredArea"></div>
+    <div class="board-controls">
+      <input type="file" id="boardFileInput" accept="image/*" />
+      <button id="boardUploadBtn">Add to Board</button>
+    </div>
+    <div id="emptyBoard">No images yet. Be the first to add one.</div>
+    <div id="imageGrid"></div>
+  </div>
+
+  <!-- Call status -->
+  <div id="callStatus">
+    <span id="callStatusText">In call</span>
+    <div id="callControls">
+      <button id="muteBtn">Mute</button>
+      <button id="hangupBtn">Hang Up</button>
+    </div>
+  </div>
+
+  <!-- Incoming call dialog -->
+  <div id="incomingCall">
+    <p><strong id="incomingCallUser"></strong> is calling you...</p>
+    <button id="acceptCallBtn" style="background:#28a745;">Accept</button>
+    <button id="rejectCallBtn" style="background:#dc3545;">Reject</button>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox">
+    <div class="lb-inner">
+      <img id="lbImg" src="" alt="" />
+      <div class="lb-info" id="lbInfo"></div>
+      <div class="lb-actions">
+            <button class="lb-feature" id="lbFeatureBtn">Set as Featured</button>
+            <a class="lb-feature" id="lbDownloadBtn" download style="background:#007bff;color:white;text-decoration:none;padding:8px 15px;border-radius:5px;">Download</a>
+            <button class="lb-delete" id="lbDeleteBtn" style="background:#dc3545;">Delete</button>
+            <button class="lb-close" id="lbCloseBtn">Close</button>
+        </div>
+    </div>
+  </div>
+
+  <audio id="remoteAudio" autoplay playsinline></audio>
+
+  <script>
+    let ws;
+    let myId = null;
+    let myUsername = null;
+    let authPassword = sessionStorage.getItem('lanChatPassword');
+    let reconnectTimer = null;
+
+    // Board state (kept client-side)
+    let boardImages = [];      // newest first
+    let featuredId = null;
+    let lightboxImageId = null;
+
+    // ---------------- Login ----------------
+    const loginOverlay = document.getElementById('loginOverlay');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginError = document.getElementById('loginError');
+
+    function showLogin(msg) {
+      loginOverlay.style.display = 'flex';
+      if (msg) loginError.textContent = msg;
+      passwordInput.focus();
+    }
+    function hideLogin() {
+      loginOverlay.style.display = 'none';
+      loginError.textContent = '';
+    }
+
+    document.getElementById('loginButton').addEventListener('click', () => {
+      const pw = passwordInput.value.trim();
+      if (!pw) return;
+      authPassword = pw;
+      sessionStorage.setItem('lanChatPassword', pw);
+      warmUpMicrophone();
+      connect();
+    });
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') document.getElementById('loginButton').click();
+    });
+
+    // ---------------- Tabs ----------------
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab + 'Panel').classList.add('active');
+        // When switching to board, make sure we have fresh data
+        if (tab.dataset.tab === 'board') loadBoardFromServer();
+      });
+    });
+
+    // ---------------- Ringtone ----------------
+    let ringtoneCtx = null;
+    let ringtoneTimer = null;
+
+    function startRingtone() {
+      stopRingtone();
+      try {
+        ringtoneCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const beep = () => {
+          if (!ringtoneCtx) return;
+          const osc = ringtoneCtx.createOscillator();
+          const gain = ringtoneCtx.createGain();
+          osc.connect(gain);
+          gain.connect(ringtoneCtx.destination);
+          osc.type = 'sine';
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, ringtoneCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.15, ringtoneCtx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ringtoneCtx.currentTime + 0.5);
+          osc.start(ringtoneCtx.currentTime);
+          osc.stop(ringtoneCtx.currentTime + 0.55);
+        };
+        beep();
+        ringtoneTimer = setInterval(beep, 1200);
+      } catch (e) { console.log('Ringtone error:', e); }
+    }
+    function stopRingtone() {
+      if (ringtoneTimer) { clearInterval(ringtoneTimer); ringtoneTimer = null; }
+      if (ringtoneCtx) { ringtoneCtx.close().catch(() => {}); ringtoneCtx = null; }
+    }
+
+    // ---------------- Mic warm-up ----------------
+    async function warmUpMicrophone() {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        s.getTracks().forEach(t => t.stop());
+        console.log('Microphone permission granted.');
+      } catch (e) {
+        console.warn('Microphone permission denied or unavailable:', e);
+      }
+    }
+
+    // ---------------- WebSocket ----------------
+    function connect() {
+      if (!authPassword) { showLogin(); return; }
+      hideLogin();
+
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(protocol + window.location.host + '/ws');
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'auth', password: authPassword }));
+      };
+
+      ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+
+      ws.onclose = (event) => {
+        if (event.code === 1008) {
+          sessionStorage.removeItem('lanChatPassword');
+          authPassword = null;
+          passwordInput.value = '';
+          showLogin('Wrong password. Try again.');
+          return;
+        }
+        reconnectTimer = setTimeout(connect, 2000);
+      };
+    }
+
+    function handleMessage(data) {
+      const messagesDiv = document.getElementById('messages');
+
+      switch (data.type) {
+        case 'welcome':
+          myId = data.id;
+          myUsername = data.username;
+          console.log('My ID:', myId, 'Username:', myUsername);
+          // Load the image board after we're connected
+          loadBoardFromServer();
+          break;
+
+        case 'userlist':
+          updateUserList(data.users);
+          break;
+
+        case 'chat': {
+          const div = document.createElement('div');
+          div.className = 'message';
+          const time = new Date(data.timestamp).toLocaleTimeString();
+          div.innerHTML = `<strong>${data.username}:</strong> ${escapeHtml(data.text)}<span class="time">${time}</span>`;
+          messagesDiv.appendChild(div);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+          break;
+        }
+
+        case 'file':
+          handleFileMessage(data);
+          break;
+
+        case 'system': {
+          const sysDiv = document.createElement('div');
+          sysDiv.className = 'system';
+          sysDiv.textContent = data.text;
+          messagesDiv.appendChild(sysDiv);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+          break;
+        }
+
+        case 'image_added':
+          boardImages.unshift(data.image);
+          renderBoard();
+          break;
+
+        case 'image_featured':
+          featuredId = data.featured_id;
+          renderBoard();
+          break;
+        case 'image_deleted':
+            boardImages = boardImages.filter(i => i.id !== data.image_id);
+            featuredId = data.featured_id;
+            renderBoard();
+            if (lightboxImageId === data.image_id) closeLightbox();
+            break;
+        case 'file_deleted':
+            // Remove any chat messages referencing this URL
+            document.querySelectorAll('.file-message').forEach(el => {
+                if (el.dataset.url === data.url) el.remove();
+            });
+            // If it was on the board, remove it there too
+            if (data.image_id) {
+                boardImages = boardImages.filter(i => i.id !== data.image_id);
+                featuredId = data.featured_id;
+                renderBoard();
+                if (lightboxImageId === data.image_id) closeLightbox();
+            }
+            break;
+
+        case 'call-request':    handleIncomingCall(data.from, data.fromUsername); break;
+        case 'call-accept':     handleCallAccepted(data.from); break;
+        case 'call-reject':     handleCallRejected(); break;
+        case 'call-end':        handleCallEnded(); break;
+        case 'offer':           handleOffer(data.from, data.sdp); break;
+        case 'answer':          handleAnswer(data.from, data.sdp); break;
+        case 'ice-candidate':   handleIceCandidate(data.from, data.candidate); break;
+      }
+    }
+
+    // ---------------- Board ----------------
+    async function loadBoardFromServer() {
+      try {
+        const resp = await fetch('/images', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        boardImages = data.images || [];
+        featuredId = data.featured_id;
+        renderBoard();
+      } catch (e) {
+        console.warn('Failed to load board:', e);
+      }
+    }
+
+    function renderBoard() {
+      // Featured
+      const featuredArea = document.getElementById('featuredArea');
+      if (featuredId) {
+        const feat = boardImages.find(i => i.id === featuredId);
+        if (feat) {
+          featuredArea.innerHTML = `
+            <div class="featured-card">
+              <span class="featured-label">★ Featured by ${escapeHtml(feat.uploader)}</span>
+              <img src="${feat.url}" alt="${escapeHtml(feat.filename)}" data-id="${feat.id}" class="featured-img" />
+            </div>`;
+          featuredArea.querySelector('img').addEventListener('click', () => openLightbox(feat.id));
+        } else {
+          featuredArea.innerHTML = '';
+        }
+      } else {
+        featuredArea.innerHTML = '';
+      }
+
+      // Grid
+      const grid = document.getElementById('imageGrid');
+      const empty = document.getElementById('emptyBoard');
+      if (boardImages.length === 0) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      grid.innerHTML = boardImages.map(img => `
+        <div class="thumb ${img.id === featuredId ? 'featured' : ''}" data-id="${img.id}">
+          <img src="${img.url}" alt="${escapeHtml(img.filename)}" loading="lazy" />
+          <div class="uploader-tag">${escapeHtml(img.uploader)}</div>
+        </div>
+      `).join('');
+
+      grid.querySelectorAll('.thumb').forEach(el => {
+        el.addEventListener('click', () => openLightbox(el.dataset.id));
+      });
+    }
+
+    // Lightbox
+    const lightbox = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lbImg');
+    const lbInfo = document.getElementById('lbInfo');
+    const lbFeatureBtn = document.getElementById('lbFeatureBtn');
+
+    function openLightbox(id) {
+        const img = boardImages.find(i => i.id === id);
+        if (!img) return;
+        lightboxImageId = id;
+        lbImg.src = img.url;
+        lbImg.alt = img.filename;
+        const time = new Date(img.timestamp).toLocaleString();
+        lbInfo.textContent = `${img.uploader} • ${time}`;
+        lbFeatureBtn.textContent = (id === featuredId) ? 'Unfeature' : 'Set as Featured';
+
+        const dl = document.getElementById('lbDownloadBtn');
+        dl.href = '#';
+        dl.dataset.url = img.url;
+        dl.dataset.name = img.filename;
+
+        lightbox.style.display = 'flex';
+        }
+    function closeLightbox() {
+      lightbox.style.display = 'none';
+      lightboxImageId = null;
+      lbImg.src = '';
+    }
+
+    document.getElementById('lbDownloadBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (lightboxImageId) {
+            const img = boardImages.find(i => i.id === lightboxImageId);
+            if (img) downloadFile(img.url, img.filename);
+        }
+        });
+
+    document.getElementById('lbCloseBtn').addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+
+    
+
+    document.getElementById('lbDeleteBtn').addEventListener('click', async () => {
+        if (!lightboxImageId || !authPassword) return;
+        if (!confirm('Delete this image permanently?')) return;
+        const fd = new FormData();
+        fd.append('image_id', lightboxImageId);
+        fd.append('password', authPassword);
+        try {
+            const resp = await fetch('/delete', { method: 'POST', body: fd });
+            if (resp.ok) {
+            // server broadcasts image_deleted, board updates automatically
+            closeLightbox();
+            } else if (resp.status === 401) {
+            alert('Wrong password.');
+            } else {
+            alert('Delete failed: ' + resp.status);
+            }
+        } catch (e) { console.error(e); }
+        });
+
+    lbFeatureBtn.addEventListener('click', async () => {
+      if (!lightboxImageId || !authPassword) return;
+      const fd = new FormData();
+      fd.append('image_id', lightboxImageId);
+      fd.append('password', authPassword);
+      try {
+        const resp = await fetch('/feature', { method: 'POST', body: fd });
+        if (resp.ok) {
+          const data = await resp.json();
+          featuredId = data.featured_id;
+          renderBoard();
+          closeLightbox();
+        } else if (resp.status === 401) {
+          alert('Wrong password.');
+        }
+      } catch (e) { console.error(e); }
+    });
+
+    // Board upload
+    document.getElementById('boardUploadBtn').addEventListener('click', async () => {
+      const input = document.getElementById('boardFileInput');
+      const file = input.files[0];
+      if (!file) { alert('Choose an image first.'); return; }
+      if (!file.type.startsWith('image/')) { alert('Only images allowed on the board.'); return; }
+      if (!authPassword) { alert('Not authenticated.'); return; }
+
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('password', authPassword);
+      if (myId) fd.append('user_id', myId);
+
+      try {
+        const resp = await fetch('/upload', { method: 'POST', body: fd });
+        if (resp.ok) {
+          input.value = '';
+          // The server broadcasts image_added, so the board updates automatically.
+        } else if (resp.status === 401) {
+          alert('Wrong password.');
+        } else {
+          alert('Upload failed: ' + resp.status);
+        }
+      } catch (e) { console.error(e); }
+    });
+
+    // ---------------- Chat and files ----------------
+       function handleFileMessage(data) {
+        const messagesDiv = document.getElementById('messages');
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'file-message';
+        fileDiv.dataset.url = data.url;
+        const time = new Date(data.timestamp).toLocaleTimeString();
+        const badge = data.private ? '<span class="private-badge">[private]</span> ' : '';
+        const delBtn = `<button class="del-file-btn" data-url="${data.url}" title="Delete file from server">🗑</button>`;
+
+        if (data.content_type && data.content_type.startsWith('image/')) {
+            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared an image${delBtn}<br>
+            <img src="${data.url}" alt="${escapeHtml(data.filename)}" />
+            <br><a class="dl-link" href="#" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">⬇ Download</a>
+            <span class="time">${time}</span>`;
+        } else {
+            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared a file:${delBtn}
+            <a href="#" class="dl-link" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>
+            <span class="time">${time}</span>`;
+        }
+
+        // Wire up download links
+        fileDiv.querySelectorAll('.dl-link').forEach(el => {
+            el.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                downloadFile(el.dataset.url, el.dataset.name);
+            });
+        });
+
+        // Wire up delete button
+        fileDiv.querySelectorAll('.del-file-btn').forEach(el => {
+            el.addEventListener('click', async (ev) => {
+                ev.preventDefault();
+                if (!confirm('Delete this file from the server? This cannot be undone.')) return;
+                if (!authPassword) return;
+                const fd = new FormData();
+                fd.append('url', el.dataset.url);
+                fd.append('password', authPassword);
+                try {
+                    const resp = await fetch('/delete-file', { method: 'POST', body: fd });
+                    if (resp.status === 401) alert('Wrong password.');
+                    // On success, the server broadcasts file_deleted; all clients update.
+                } catch (e) { console.error(e); }
+            });
+        });
+
+        messagesDiv.appendChild(fileDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    
+
+   function updateUserList(users) {
+        const userlistDiv = document.getElementById('userlist');
+        let html = 'Online: ';
+        users.forEach(user => {
+            html += `<div class="user-item">
+            <span>${user.username}</span>
+            ${user.id !== myId ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
+            </div>`;
+        });
+        userlistDiv.innerHTML = html;
+
+        document.querySelectorAll('.call-btn').forEach(btn => {
+            btn.addEventListener('click', () => startCall(btn.getAttribute('data-id')));
+        });
+
+        // Rebuild the "Send to" dropdown, preserving the previous selection if still valid
+        const sel = document.getElementById('targetSelect');
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">Everyone</option>';
+        users.forEach(user => {
+            if (user.id === myId) return;
+            const opt = document.createElement('option');
+            opt.value = user.id;
+            opt.textContent = user.username;
+            sel.appendChild(opt);
+        });
+        if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+        }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (text && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'chat', text }));
+        input.value = '';
+      }
+    }
+
+    async function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) { alert('Please select a file first.'); return; }
+        if (!authPassword) { alert('Not authenticated.'); return; }
+
+        const targetId = document.getElementById('targetSelect').value;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('password', authPassword);
+        if (myId) formData.append('user_id', myId);
+        if (targetId) formData.append('target_id', targetId);
+
+      try {
+        const response = await fetch('/upload', { method: 'POST', body: formData });
+        if (response.ok) {
+          fileInput.value = '';
+        } else if (response.status === 401) {
+          alert('Upload rejected: wrong password.');
+        }
+      } catch (err) { console.error('Upload error:', err); }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function downloadFile(url, filename) {
+        try {
+            const resp = await fetch(url, { cache: 'no-store' });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const blob = await resp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename || 'download';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+        } catch (e) {
+            alert('Download failed: ' + e.message);
+        }
+        }
+
+    // ---------------- WebRTC (unchanged) ----------------
+    let localStream = null;
+    let peerConnection = null;
+    let currentCallPartnerId = null;
+    let isMuted = false;
+    let isInCall = false;
+
+    async function startCall(targetId) {
+      if (isInCall) { alert('You are already in a call. Hang up first.'); return; }
+      currentCallPartnerId = targetId;
+      ws.send(JSON.stringify({ type: 'call-request', target: targetId }));
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        alert('Microphone access denied or not available.');
+        ws.send(JSON.stringify({ type: 'call-end', target: targetId }));
+        currentCallPartnerId = null;
+        return;
+      }
+      showCallStatus('Calling...');
+    }
+
+    function handleIncomingCall(fromId, fromUsername) {
+      if (isInCall) {
+        ws.send(JSON.stringify({ type: 'call-reject', target: fromId }));
+        return;
+      }
+      currentCallPartnerId = fromId;
+      document.getElementById('incomingCallUser').textContent = fromUsername;
+      document.getElementById('incomingCall').style.display = 'block';
+      startRingtone();
+    }
+
+    document.getElementById('acceptCallBtn').addEventListener('click', async () => {
+      stopRingtone();
+      document.getElementById('incomingCall').style.display = 'none';
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        alert('Microphone access denied or not available.');
+        ws.send(JSON.stringify({ type: 'call-reject', target: currentCallPartnerId }));
+        currentCallPartnerId = null;
+        return;
+      }
+      ws.send(JSON.stringify({ type: 'call-accept', target: currentCallPartnerId }));
+      await createPeerConnection();
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      ws.send(JSON.stringify({ type: 'offer', target: currentCallPartnerId, sdp: offer }));
+      showCallStatus(`In call with ${currentCallPartnerId}`);
+      isInCall = true;
+    });
+
+    document.getElementById('rejectCallBtn').addEventListener('click', () => {
+      stopRingtone();
+      document.getElementById('incomingCall').style.display = 'none';
+      ws.send(JSON.stringify({ type: 'call-reject', target: currentCallPartnerId }));
+      currentCallPartnerId = null;
+    });
+
+    function handleCallAccepted(fromId) {
+      if (currentCallPartnerId !== fromId) return;
+      createPeerConnection().then(async () => {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        ws.send(JSON.stringify({ type: 'offer', target: fromId, sdp: offer }));
+        showCallStatus(`In call with ${fromId}`);
+        isInCall = true;
+      });
+    }
+
+    function handleCallRejected() { alert('Call rejected by the other user.'); cleanupCall(); hideCallStatus(); }
+    function handleCallEnded()    { alert('Call ended by the other user.');   cleanupCall(); hideCallStatus(); }
+
+    function hangup() {
+      if (currentCallPartnerId) ws.send(JSON.stringify({ type: 'call-end', target: currentCallPartnerId }));
+      cleanupCall();
+      hideCallStatus();
+    }
+
+    function cleanupCall() {
+      stopRingtone();
+      if (peerConnection) {
+        peerConnection.onicecandidate = null;
+        peerConnection.ontrack = null;
+        peerConnection.close();
+        peerConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      const remoteAudio = document.getElementById('remoteAudio');
+      if (remoteAudio) remoteAudio.srcObject = null;
+      currentCallPartnerId = null;
+      isInCall = false;
+      isMuted = false;
+      document.getElementById('muteBtn').textContent = 'Mute';
+    }
+
+    function showCallStatus(text) {
+      document.getElementById('callStatusText').textContent = text;
+      document.getElementById('callStatus').style.display = 'block';
+    }
+    function hideCallStatus() { document.getElementById('callStatus').style.display = 'none'; }
+
+    async function createPeerConnection() {
+      peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      peerConnection.ontrack = (event) => {
+        const remoteAudio = document.getElementById('remoteAudio');
+        remoteAudio.srcObject = event.streams[0];
+        remoteAudio.play().catch(e => console.log('Playback error:', e));
+      };
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          ws.send(JSON.stringify({
+            type: 'ice-candidate',
+            target: currentCallPartnerId,
+            candidate: event.candidate
+          }));
+        }
+      };
+      peerConnection.onconnectionstatechange = () => console.log('Connection state:', peerConnection.connectionState);
+      peerConnection.oniceconnectionstatechange = () => console.log('ICE state:', peerConnection.iceConnectionState);
+      return peerConnection;
+    }
+
+    async function handleOffer(fromId, sdp) {
+      if (currentCallPartnerId !== fromId) return;
+      await createPeerConnection();
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      ws.send(JSON.stringify({ type: 'answer', target: fromId, sdp: answer }));
+      showCallStatus(`In call with ${fromId}`);
+      isInCall = true;
+    }
+
+    async function handleAnswer(fromId, sdp) {
+      if (currentCallPartnerId !== fromId) return;
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+    }
+
+    function handleIceCandidate(fromId, candidate) {
+      if (currentCallPartnerId !== fromId || !peerConnection) return;
+      peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+        .catch(e => console.log('Error adding ICE:', e));
+    }
+
+    document.getElementById('muteBtn').addEventListener('click', () => {
+      if (!localStream) return;
+      isMuted = !isMuted;
+      localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+      document.getElementById('muteBtn').textContent = isMuted ? 'Unmute' : 'Mute';
+    });
+
+    document.getElementById('hangupBtn').addEventListener('click', hangup);
+    document.getElementById('sendButton').addEventListener('click', sendMessage);
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+    document.getElementById('uploadButton').addEventListener('click', uploadFile);
+
+    // ---------------- Start ----------------
+    if (authPassword) {
+      warmUpMicrophone();
+      connect();
+    } else {
+      showLogin();
+    }
+  </script>
+</body>
+</html>

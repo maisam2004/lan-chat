@@ -3,229 +3,643 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LAN Chat</title>
+  <title>LAN Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 10px;
-      background: #f5f5f5;
+    :root {
+      /* Surfaces */
+      --surface: #f8f9ff;
+      --surface-lowest: #ffffff;
+      --surface-low: #eff4ff;
+      --surface-container: #e5eeff;
+      --surface-container-high: #dce9ff;
+      --surface-highest: #d3e4fe;
+      /* Text */
+      --on-surface: #0b1c30;
+      --on-surface-variant: #424754;
+      --outline: #727785;
+      --outline-variant: #c2c6d6;
+      /* Brand */
+      --primary: #0058be;
+      --primary-hover: #004395;
+      --on-primary: #ffffff;
+      --primary-container: #d8e2ff;
+      /* Semantic */
+      --success: #006c49;
+      --success-container: #6cf8bb;
+      --error: #ba1a1a;
+      --error-container: #ffdad6;
+      /* Radii */
+      --r-sm: 0.25rem;
+      --r-md: 0.5rem;
+      --r-lg: 0.75rem;
+      --r-xl: 1rem;
+      --r-full: 9999px;
+      /* Spacing */
+      --s-xs: 0.25rem;
+      --s-sm: 0.5rem;
+      --s-md: 1rem;
+      --s-lg: 1.5rem;
+      --s-xl: 2rem;
+      /* Fonts */
+      --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      --font-body: 'Geist', system-ui, -apple-system, sans-serif;
     }
-    h1 { color: #333; text-align: center; margin: 10px 0; font-size: 1.3em; }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-body);
+      color: var(--on-surface);
+      background: var(--surface);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      font-size: 15px;
+    }
+
+    /* Layout */
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--s-md);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    @media (min-width: 768px) {
+      .app { padding: var(--s-lg) var(--s-xl); }
+    }
+
+    /* Header */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--s-md);
+      padding-bottom: var(--s-md);
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: var(--s-sm);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+      color: var(--on-surface);
+    }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--r-md);
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: var(--font-display);
+    }
+    .brand-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--success);
+      background: #e6fbf2;
+      padding: 4px 10px;
+      border-radius: var(--r-full);
+      letter-spacing: 0.02em;
+    }
+    .brand-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(0, 108, 73, 0.15);
+    }
 
     /* Tabs */
     .tabs {
       display: flex;
-      gap: 4px;
-      margin-bottom: 10px;
-      border-bottom: 2px solid #ddd;
+      gap: var(--s-xs);
+      margin-bottom: var(--s-md);
+      padding: 4px;
+      background: var(--surface-container);
+      border-radius: var(--r-md);
+      width: fit-content;
     }
     .tab {
-      flex: 1;
-      padding: 10px;
+      padding: 8px 18px;
       background: transparent;
       border: none;
-      border-bottom: 3px solid transparent;
-      color: #666;
-      font-size: 1em;
+      border-radius: var(--r-sm);
+      color: var(--on-surface-variant);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
       cursor: pointer;
-      border-radius: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tab:hover {
+      color: var(--on-surface);
     }
     .tab.active {
-      color: #007bff;
-      border-bottom-color: #007bff;
-      font-weight: bold;
+      background: var(--surface-lowest);
+      color: var(--primary);
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
     }
+
     .panel { display: none; }
     .panel.active { display: block; }
 
-    /* Chat */
+    /* User list */
     #userlist {
-      border: 1px solid #ccc;
-      background: white;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 5px;
-      font-size: 0.95em;
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-lg);
+      padding: var(--s-sm);
+      margin-bottom: var(--s-md);
+    }
+    .userlist-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--s-sm) var(--s-md);
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--on-surface-variant);
+    }
+    .userlist-count {
+      background: var(--surface-container);
+      color: var(--primary);
+      padding: 2px 8px;
+      border-radius: var(--r-full);
+      font-size: 0.7rem;
+      font-weight: 600;
     }
     .user-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin: 5px 0;
+      padding: 10px var(--s-md);
+      border-radius: var(--r-md);
+      transition: background 0.15s;
+    }
+    .user-item:hover {
+      background: var(--surface-low);
+    }
+    .user-item + .user-item {
+      border-top: 1px solid var(--surface-container);
+    }
+    .user-name {
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: var(--on-surface);
     }
     .call-btn {
-      background: #28a745;
-      border: none;
-      color: white;
-      padding: 5px 10px;
-      border-radius: 3px;
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      color: var(--primary);
+      padding: 6px 12px;
+      border-radius: var(--r-md);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 500;
       cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
     }
-    #messages {
-      height: 300px;
-      overflow-y: auto;
-      border: 1px solid #ccc;
-      background: white;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 5px;
-    }
-    .message { margin: 5px 0; }
-    .message .time { color: #999; font-size: 0.8em; margin-left: 10px; }
-    .system { color: #888; font-style: italic; }
-    .file-message { margin: 5px 0; }
-    .file-message img { max-width: 100%; border-radius: 5px; }
-    #inputArea, #fileArea { display: flex; gap: 5px; margin-bottom: 8px; }
-    #messageInput, #fileInput { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-    #targetSelect {
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        background: white;
-        max-width: 130px;
-        }
-    .file-message .dl-link {
-        font-size: 0.85em;
-        color: #007bff;
-        text-decoration: none;
-        display: inline-block;
-        margin-top: 4px;
-        }
-    .file-message .del-file-btn {
-    background: transparent;
-    color: #dc3545;
-    border: none;
-    padding: 2px 6px;
-    font-size: 0.9em;
-    cursor: pointer;
-    margin-left: 4px;
-    border-radius: 3px;
-    }
-.file-message .del-file-btn:hover {
-    background: #f8d7da;
+    .call-btn:hover {
+      background: var(--surface-low);
+      border-color: var(--primary);
     }
 
-    button {
-      padding: 8px 15px;
-      border: none;
-      background: #007bff;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
+    /* Messages */
+    #messages {
+      height: 380px;
+      overflow-y: auto;
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-lg);
+      padding: var(--s-md);
+      margin-bottom: var(--s-md);
     }
-    button:disabled { background: #aaa; cursor: not-allowed; }
+    #messages::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-thumb {
+      background: var(--outline-variant);
+      border-radius: var(--r-full);
+    }
+
+    .message {
+      margin: var(--s-sm) 0;
+      padding: 10px 14px;
+      border-radius: var(--r-lg);
+      max-width: 78%;
+      word-wrap: break-word;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .message .time {
+      color: var(--outline);
+      font-size: 0.7rem;
+      margin-left: var(--s-sm);
+      font-variant-numeric: tabular-nums;
+    }
+    .message.incoming {
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      color: var(--on-surface);
+      margin-right: auto;
+    }
+    .message.incoming strong { color: var(--on-surface); }
+    .message.outgoing {
+      background: var(--surface-low);
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+      margin-left: auto;
+    }
+    .message.outgoing strong { color: #1e3a8a; }
+
+    .system {
+      color: var(--outline);
+      font-style: italic;
+      font-size: 0.8rem;
+      text-align: center;
+      margin: var(--s-md) 0;
+      padding: 6px 0;
+    }
+
+    /* File messages */
+    .file-message {
+      margin: var(--s-sm) 0;
+      padding: 12px 14px;
+      border-radius: var(--r-lg);
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      max-width: 90%;
+      font-size: 0.9rem;
+      margin-right: auto;
+    }
+    .file-message.outgoing {
+      background: var(--surface-low);
+      border-color: #bfdbfe;
+      margin-left: auto;
+      margin-right: 0;
+    }
+    .file-message strong { color: var(--on-surface); }
+    .file-message.outgoing strong { color: #1e3a8a; }
+    .file-message img {
+      max-width: 100%;
+      border-radius: var(--r-md);
+      margin-top: var(--s-sm);
+      display: block;
+    }
+    .file-message .dl-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      margin-top: 6px;
+      padding: 4px 10px;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--r-md);
+      background: var(--surface-lowest);
+      transition: background 0.15s;
+    }
+    .file-message .dl-link:hover {
+      background: var(--surface-low);
+    }
+    .file-message .private-badge {
+      display: inline-block;
+      color: var(--error);
+      background: var(--error-container);
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: var(--r-full);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    .file-message .del-file-btn {
+      background: transparent;
+      border: none;
+      color: var(--outline);
+      padding: 2px 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-left: 6px;
+      border-radius: var(--r-sm);
+      transition: color 0.15s, background 0.15s;
+    }
+    .file-message .del-file-btn:hover {
+      color: var(--error);
+      background: var(--error-container);
+    }
+
+    /* Composer */
+    .composer {
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-lg);
+      padding: var(--s-sm);
+    }
+    #inputArea, #fileArea {
+      display: flex;
+      gap: var(--s-sm);
+      align-items: center;
+    }
+    #inputArea { margin-bottom: 6px; }
+    #messageInput, #fileInput {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid transparent;
+      border-radius: var(--r-md);
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      color: var(--on-surface);
+      background: transparent;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    #messageInput {
+      background: var(--surface-low);
+    }
+    #messageInput:focus {
+      border-color: var(--primary);
+      background: var(--surface-lowest);
+      box-shadow: 0 0 0 3px rgba(0, 88, 190, 0.12);
+    }
+    #messageInput::placeholder { color: var(--outline); }
+
+    #fileInput {
+      font-size: 0.8rem;
+      color: var(--on-surface-variant);
+      background: var(--surface-low);
+      border: 1px solid var(--outline-variant);
+      padding: 8px 12px;
+    }
+    #fileInput::file-selector-button {
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      color: var(--on-surface);
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-right: var(--s-sm);
+    }
+
+    #targetSelect {
+      padding: 8px 12px;
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-md);
+      background: var(--surface-lowest);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      color: var(--on-surface);
+      cursor: pointer;
+      max-width: 140px;
+    }
+    #targetSelect:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 88, 190, 0.12);
+    }
+
+    /* Buttons */
+    button {
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 9px 16px;
+      border: none;
+      border-radius: var(--r-md);
+      background: var(--primary);
+      color: var(--on-primary);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    button:hover { background: var(--primary-hover); }
+    button:active { transform: translateY(1px); }
+    button:disabled {
+      background: var(--surface-container);
+      color: var(--outline);
+      cursor: not-allowed;
+    }
+    #sendButton, #uploadButton {
+      padding: 9px 18px;
+    }
 
     /* Call status */
     #callStatus {
-      margin: 10px 0;
-      padding: 10px;
-      background: #e9f7ef;
-      border-radius: 5px;
+      margin: var(--s-md) 0;
+      padding: var(--s-md);
+      background: var(--surface-low);
+      border: 1px solid #bfdbfe;
+      border-radius: var(--r-lg);
       display: none;
     }
-    #callControls { display: flex; gap: 10px; margin-top: 10px; }
-    #muteBtn { background: #ffc107; }
-    #hangupBtn { background: #dc3545; }
+    #callStatusText {
+      font-weight: 600;
+      color: var(--primary);
+      font-size: 0.9rem;
+    }
+    #callControls {
+      display: flex;
+      gap: var(--s-sm);
+      margin-top: var(--s-sm);
+    }
+    #muteBtn {
+      background: #fef3c7;
+      color: #78350f;
+    }
+    #muteBtn:hover { background: #fde68a; }
+    #hangupBtn {
+      background: var(--error-container);
+      color: var(--error);
+    }
+    #hangupBtn:hover { background: #fecaca; }
 
+    /* Incoming call dialog */
     #incomingCall {
       position: fixed;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      background: white;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      background: var(--surface-lowest);
+      padding: var(--s-lg);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-xl);
+      box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
       display: none;
       z-index: 1000;
+      min-width: 280px;
+      text-align: center;
+    }
+    #incomingCall p {
+      font-size: 0.95rem;
+      margin: 0 0 var(--s-md) 0;
+      color: var(--on-surface);
+    }
+    #incomingCall strong { font-family: var(--font-display); }
+    #acceptCallBtn, #rejectCallBtn {
+      margin: 0 4px;
     }
 
     /* Login */
     #loginOverlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.55);
+      background: rgba(11, 28, 48, 0.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 2000;
+      padding: var(--s-md);
     }
-   
-
     #loginBox {
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      width: 280px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      background: var(--surface-lowest);
+      padding: var(--s-xl);
+      border-radius: var(--r-xl);
+      width: 100%;
+      max-width: 340px;
+      box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
       text-align: center;
     }
-    #loginBox h2 { margin: 0 0 15px 0; color: #333; }
+    #loginBox h2 {
+      font-family: var(--font-display);
+      margin: 0 0 var(--s-md) 0;
+      font-size: 1.25rem;
+      color: var(--on-surface);
+      letter-spacing: -0.01em;
+    }
     #passwordInput {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      margin-bottom: 10px;
-      font-size: 16px;
+      padding: 11px 14px;
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-md);
+      margin-bottom: var(--s-sm);
+      font-size: 0.95rem;
+      font-family: var(--font-body);
+      color: var(--on-surface);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: var(--surface-lowest);
     }
-    #loginButton { width: 100%; }
-    #loginError { color: #dc3545; font-size: 0.9em; margin: 8px 0 0 0; min-height: 1em; }
+    #passwordInput:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 88, 190, 0.12);
+    }
+    #loginButton {
+      width: 100%;
+      padding: 11px;
+      font-size: 0.9rem;
+    }
+    #loginError {
+      color: var(--error);
+      font-size: 0.8rem;
+      margin: var(--s-sm) 0 0 0;
+      min-height: 1em;
+    }
 
     /* Board */
-    #featuredArea {
-      margin-bottom: 10px;
-    }
+    #featuredArea { margin-bottom: var(--s-md); }
     #featuredArea .featured-card {
       position: relative;
-      border-radius: 8px;
+      border-radius: var(--r-lg);
       overflow: hidden;
-      background: black;
+      background: var(--on-surface);
+      border: 1px solid var(--outline-variant);
     }
     #featuredArea img {
       width: 100%;
       max-height: 45vh;
       object-fit: contain;
-      background: #000;
+      background: var(--on-surface);
       display: block;
     }
     #featuredArea .featured-label {
       position: absolute;
-      top: 8px; left: 8px;
-      background: rgba(0,0,0,0.65);
+      top: 10px; left: 10px;
+      background: rgba(11, 28, 48, 0.75);
       color: white;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.8em;
+      padding: 5px 12px;
+      border-radius: var(--r-full);
+      font-size: 0.7rem;
+      font-weight: 500;
+      font-family: var(--font-body);
+      letter-spacing: 0.02em;
     }
     .board-controls {
       display: flex;
-      gap: 5px;
-      margin-bottom: 10px;
+      gap: var(--s-sm);
+      margin-bottom: var(--s-md);
       align-items: center;
+      padding: var(--s-sm);
+      background: var(--surface-lowest);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--r-lg);
     }
     .board-controls input[type="file"] {
       flex: 1;
-      padding: 6px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+      padding: 8px 12px;
+      background: transparent;
+      border: none;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      color: var(--on-surface-variant);
+      outline: none;
+    }
+    .board-controls input[type="file"]::file-selector-button {
+      background: var(--surface-low);
+      border: 1px solid var(--outline-variant);
+      color: var(--on-surface);
+      padding: 5px 12px;
+      border-radius: var(--r-sm);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-right: var(--s-sm);
     }
     #imageGrid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-      gap: 6px;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: var(--s-sm);
     }
     .thumb {
       position: relative;
-      padding-bottom: 100%; /* square */
+      padding-bottom: 100%;
       overflow: hidden;
-      border-radius: 6px;
+      border-radius: var(--r-lg);
       cursor: pointer;
-      background: #eee;
+      background: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .thumb:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px -4px rgba(15, 23, 42, 0.12);
     }
     .thumb img {
       position: absolute;
@@ -237,70 +651,98 @@
     .thumb .uploader-tag {
       position: absolute;
       bottom: 0; left: 0; right: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+      background: linear-gradient(to top, rgba(11, 28, 48, 0.8), transparent);
       color: white;
-      font-size: 0.7em;
-      padding: 14px 6px 4px 6px;
+      font-size: 0.7rem;
+      padding: 16px 8px 6px 8px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-weight: 500;
     }
     .thumb.featured::after {
       content: '★';
       position: absolute;
-      top: 4px; right: 6px;
+      top: 6px; right: 8px;
       color: #ffd700;
       font-size: 1.2em;
-      text-shadow: 0 0 4px black;
+      text-shadow: 0 0 4px rgba(0,0,0,0.8);
     }
 
     /* Lightbox */
     #lightbox {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.9);
+      background: rgba(11, 28, 48, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1500;
-      padding: 15px;
+      padding: var(--s-md);
     }
     #lightbox .lb-inner {
       max-width: 100%;
       max-height: 100%;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: var(--s-md);
       align-items: center;
     }
     #lightbox img {
       max-width: 100%;
-      max-height: 75vh;
+      max-height: 70vh;
       object-fit: contain;
-      border-radius: 4px;
+      border-radius: var(--r-md);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
     }
     #lightbox .lb-info {
-      color: white;
-      font-size: 0.9em;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.85rem;
       text-align: center;
+      font-family: var(--font-body);
     }
     #lightbox .lb-actions {
       display: flex;
-      gap: 10px;
+      gap: var(--s-sm);
+      flex-wrap: wrap;
+      justify-content: center;
     }
     #lightbox .lb-close {
-      background: #dc3545;
+      background: var(--error);
+      color: white;
     }
+    #lightbox .lb-close:hover { background: #991b1b; }
     #lightbox .lb-feature {
-      background: #ffc107;
-      color: #333;
+      background: #fbbf24;
+      color: #78350f;
     }
+    #lightbox .lb-feature:hover { background: #f59e0b; }
+    #lbDownloadBtn {
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      padding: 9px 16px;
+      border-radius: var(--r-md);
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    #lbDownloadBtn:hover { background: var(--primary-hover); }
+    #lbDeleteBtn { background: var(--error); color: white; }
+    #lbDeleteBtn:hover { background: #991b1b; }
 
     #emptyBoard {
       text-align: center;
-      color: #888;
-      padding: 30px 10px;
+      color: var(--outline);
+      padding: var(--s-xl);
       font-style: italic;
+      font-size: 0.9rem;
+      border: 1px dashed var(--outline-variant);
+      border-radius: var(--r-lg);
+      background: var(--surface-lowest);
     }
   </style>
 </head>
@@ -315,39 +757,50 @@
     </div>
   </div>
 
-  <h1>LAN Hub</h1>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">L</div>
+        <span>LAN Hub</span>
+      </div>
+      <div class="brand-live">LAN</div>
+    </header>
 
-  <div class="tabs">
-    <button class="tab active" data-tab="chat">💬 Chat</button>
-    <button class="tab" data-tab="board">🖼 Board</button>
-  </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="chat">Chat</button>
+      <button class="tab" data-tab="board">Board</button>
+    </div>
 
-  <!-- Chat panel -->
-  <div id="chatPanel" class="panel active">
-    <div id="userlist">Online: </div>
-    <div id="messages"></div>
-    <div id="inputArea">
-      <input type="text" id="messageInput" placeholder="Type a message..." />
-      <button id="sendButton">Send</button>
-    </div>
-    <div id="fileArea">
-    <select id="targetSelect" title="Send to...">
-        <option value="">Everyone</option>
-    </select>
-        <input type="file" id="fileInput" />
-        <button id="uploadButton">Upload</button>
-    </div>
-  </div>
+    <!-- Chat panel -->
+    <div id="chatPanel" class="panel active">
+      <div id="userlist"></div>
+      <div id="messages"></div>
 
-  <!-- Board panel -->
-  <div id="boardPanel" class="panel">
-    <div id="featuredArea"></div>
-    <div class="board-controls">
-      <input type="file" id="boardFileInput" accept="image/*" />
-      <button id="boardUploadBtn">Add to Board</button>
+      <div class="composer">
+        <div id="inputArea">
+          <input type="text" id="messageInput" placeholder="Type a message..." />
+          <button id="sendButton">Send</button>
+        </div>
+        <div id="fileArea">
+          <select id="targetSelect" title="Send to...">
+            <option value="">Everyone</option>
+          </select>
+          <input type="file" id="fileInput" />
+          <button id="uploadButton">Upload</button>
+        </div>
+      </div>
     </div>
-    <div id="emptyBoard">No images yet. Be the first to add one.</div>
-    <div id="imageGrid"></div>
+
+    <!-- Board panel -->
+    <div id="boardPanel" class="panel">
+      <div id="featuredArea"></div>
+      <div class="board-controls">
+        <input type="file" id="boardFileInput" accept="image/*" />
+        <button id="boardUploadBtn">Add to Board</button>
+      </div>
+      <div id="emptyBoard">No images yet. Be the first to add one.</div>
+      <div id="imageGrid"></div>
+    </div>
   </div>
 
   <!-- Call status -->
@@ -362,8 +815,8 @@
   <!-- Incoming call dialog -->
   <div id="incomingCall">
     <p><strong id="incomingCallUser"></strong> is calling you...</p>
-    <button id="acceptCallBtn" style="background:#28a745;">Accept</button>
-    <button id="rejectCallBtn" style="background:#dc3545;">Reject</button>
+    <button id="acceptCallBtn" style="background:#006c49;">Accept</button>
+    <button id="rejectCallBtn" style="background:#ba1a1a;">Reject</button>
   </div>
 
   <!-- Lightbox -->
@@ -372,11 +825,11 @@
       <img id="lbImg" src="" alt="" />
       <div class="lb-info" id="lbInfo"></div>
       <div class="lb-actions">
-            <button class="lb-feature" id="lbFeatureBtn">Set as Featured</button>
-            <a class="lb-feature" id="lbDownloadBtn" download style="background:#007bff;color:white;text-decoration:none;padding:8px 15px;border-radius:5px;">Download</a>
-            <button class="lb-delete" id="lbDeleteBtn" style="background:#dc3545;">Delete</button>
-            <button class="lb-close" id="lbCloseBtn">Close</button>
-        </div>
+        <button class="lb-feature" id="lbFeatureBtn">Set as Featured</button>
+        <a class="lb-feature" id="lbDownloadBtn" download>Download</a>
+        <button class="lb-delete" id="lbDeleteBtn">Delete</button>
+        <button class="lb-close" id="lbCloseBtn">Close</button>
+      </div>
     </div>
   </div>
 
@@ -389,8 +842,7 @@
     let authPassword = sessionStorage.getItem('lanChatPassword');
     let reconnectTimer = null;
 
-    // Board state (kept client-side)
-    let boardImages = [];      // newest first
+    let boardImages = [];
     let featuredId = null;
     let lightboxImageId = null;
 
@@ -428,7 +880,6 @@
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById(tab.dataset.tab + 'Panel').classList.add('active');
-        // When switching to board, make sure we have fresh data
         if (tab.dataset.tab === 'board') loadBoardFromServer();
       });
     });
@@ -511,7 +962,6 @@
           myId = data.id;
           myUsername = data.username;
           console.log('My ID:', myId, 'Username:', myUsername);
-          // Load the image board after we're connected
           loadBoardFromServer();
           break;
 
@@ -521,9 +971,10 @@
 
         case 'chat': {
           const div = document.createElement('div');
-          div.className = 'message';
-          const time = new Date(data.timestamp).toLocaleTimeString();
-          div.innerHTML = `<strong>${data.username}:</strong> ${escapeHtml(data.text)}<span class="time">${time}</span>`;
+          const outgoing = (data.username === myUsername);
+          div.className = 'message ' + (outgoing ? 'outgoing' : 'incoming');
+          const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          div.innerHTML = `<strong>${escapeHtml(data.username)}</strong><span class="time">${time}</span><br>${escapeHtml(data.text)}`;
           messagesDiv.appendChild(div);
           messagesDiv.scrollTop = messagesDiv.scrollHeight;
           break;
@@ -551,25 +1002,25 @@
           featuredId = data.featured_id;
           renderBoard();
           break;
+
         case 'image_deleted':
+          boardImages = boardImages.filter(i => i.id !== data.image_id);
+          featuredId = data.featured_id;
+          renderBoard();
+          if (lightboxImageId === data.image_id) closeLightbox();
+          break;
+
+        case 'file_deleted':
+          document.querySelectorAll('.file-message').forEach(el => {
+            if (el.dataset.url === data.url) el.remove();
+          });
+          if (data.image_id) {
             boardImages = boardImages.filter(i => i.id !== data.image_id);
             featuredId = data.featured_id;
             renderBoard();
             if (lightboxImageId === data.image_id) closeLightbox();
-            break;
-        case 'file_deleted':
-            // Remove any chat messages referencing this URL
-            document.querySelectorAll('.file-message').forEach(el => {
-                if (el.dataset.url === data.url) el.remove();
-            });
-            // If it was on the board, remove it there too
-            if (data.image_id) {
-                boardImages = boardImages.filter(i => i.id !== data.image_id);
-                featuredId = data.featured_id;
-                renderBoard();
-                if (lightboxImageId === data.image_id) closeLightbox();
-            }
-            break;
+          }
+          break;
 
         case 'call-request':    handleIncomingCall(data.from, data.fromUsername); break;
         case 'call-accept':     handleCallAccepted(data.from); break;
@@ -596,14 +1047,13 @@
     }
 
     function renderBoard() {
-      // Featured
       const featuredArea = document.getElementById('featuredArea');
       if (featuredId) {
         const feat = boardImages.find(i => i.id === featuredId);
         if (feat) {
           featuredArea.innerHTML = `
             <div class="featured-card">
-              <span class="featured-label">★ Featured by ${escapeHtml(feat.uploader)}</span>
+              <span class="featured-label">★ Featured · ${escapeHtml(feat.uploader)}</span>
               <img src="${feat.url}" alt="${escapeHtml(feat.filename)}" data-id="${feat.id}" class="featured-img" />
             </div>`;
           featuredArea.querySelector('img').addEventListener('click', () => openLightbox(feat.id));
@@ -614,7 +1064,6 @@
         featuredArea.innerHTML = '';
       }
 
-      // Grid
       const grid = document.getElementById('imageGrid');
       const empty = document.getElementById('emptyBoard');
       if (boardImages.length === 0) {
@@ -642,22 +1091,22 @@
     const lbFeatureBtn = document.getElementById('lbFeatureBtn');
 
     function openLightbox(id) {
-        const img = boardImages.find(i => i.id === id);
-        if (!img) return;
-        lightboxImageId = id;
-        lbImg.src = img.url;
-        lbImg.alt = img.filename;
-        const time = new Date(img.timestamp).toLocaleString();
-        lbInfo.textContent = `${img.uploader} • ${time}`;
-        lbFeatureBtn.textContent = (id === featuredId) ? 'Unfeature' : 'Set as Featured';
+      const img = boardImages.find(i => i.id === id);
+      if (!img) return;
+      lightboxImageId = id;
+      lbImg.src = img.url;
+      lbImg.alt = img.filename;
+      const time = new Date(img.timestamp).toLocaleString();
+      lbInfo.textContent = `${img.uploader} • ${time}`;
+      lbFeatureBtn.textContent = (id === featuredId) ? 'Unfeature' : 'Set as Featured';
 
-        const dl = document.getElementById('lbDownloadBtn');
-        dl.href = '#';
-        dl.dataset.url = img.url;
-        dl.dataset.name = img.filename;
+      const dl = document.getElementById('lbDownloadBtn');
+      dl.href = '#';
+      dl.dataset.url = img.url;
+      dl.dataset.name = img.filename;
 
-        lightbox.style.display = 'flex';
-        }
+      lightbox.style.display = 'flex';
+    }
     function closeLightbox() {
       lightbox.style.display = 'none';
       lightboxImageId = null;
@@ -665,38 +1114,35 @@
     }
 
     document.getElementById('lbDownloadBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        if (lightboxImageId) {
-            const img = boardImages.find(i => i.id === lightboxImageId);
-            if (img) downloadFile(img.url, img.filename);
-        }
-        });
+      e.preventDefault();
+      if (lightboxImageId) {
+        const img = boardImages.find(i => i.id === lightboxImageId);
+        if (img) downloadFile(img.url, img.filename);
+      }
+    });
 
     document.getElementById('lbCloseBtn').addEventListener('click', closeLightbox);
     lightbox.addEventListener('click', (e) => {
       if (e.target === lightbox) closeLightbox();
     });
 
-    
-
     document.getElementById('lbDeleteBtn').addEventListener('click', async () => {
-        if (!lightboxImageId || !authPassword) return;
-        if (!confirm('Delete this image permanently?')) return;
-        const fd = new FormData();
-        fd.append('image_id', lightboxImageId);
-        fd.append('password', authPassword);
-        try {
-            const resp = await fetch('/delete', { method: 'POST', body: fd });
-            if (resp.ok) {
-            // server broadcasts image_deleted, board updates automatically
-            closeLightbox();
-            } else if (resp.status === 401) {
-            alert('Wrong password.');
-            } else {
-            alert('Delete failed: ' + resp.status);
-            }
-        } catch (e) { console.error(e); }
-        });
+      if (!lightboxImageId || !authPassword) return;
+      if (!confirm('Delete this image permanently?')) return;
+      const fd = new FormData();
+      fd.append('image_id', lightboxImageId);
+      fd.append('password', authPassword);
+      try {
+        const resp = await fetch('/delete', { method: 'POST', body: fd });
+        if (resp.ok) {
+          closeLightbox();
+        } else if (resp.status === 401) {
+          alert('Wrong password.');
+        } else {
+          alert('Delete failed: ' + resp.status);
+        }
+      } catch (e) { console.error(e); }
+    });
 
     lbFeatureBtn.addEventListener('click', async () => {
       if (!lightboxImageId || !authPassword) return;
@@ -733,7 +1179,6 @@
         const resp = await fetch('/upload', { method: 'POST', body: fd });
         if (resp.ok) {
           input.value = '';
-          // The server broadcasts image_added, so the board updates automatically.
         } else if (resp.status === 401) {
           alert('Wrong password.');
         } else {
@@ -743,85 +1188,79 @@
     });
 
     // ---------------- Chat and files ----------------
-       function handleFileMessage(data) {
-        const messagesDiv = document.getElementById('messages');
-        const fileDiv = document.createElement('div');
-        fileDiv.className = 'file-message';
-        fileDiv.dataset.url = data.url;
-        const time = new Date(data.timestamp).toLocaleTimeString();
-        const badge = data.private ? '<span class="private-badge">[private]</span> ' : '';
-        const delBtn = `<button class="del-file-btn" data-url="${data.url}" title="Delete file from server">🗑</button>`;
+    function handleFileMessage(data) {
+      const messagesDiv = document.getElementById('messages');
+      const fileDiv = document.createElement('div');
+      const outgoing = (data.username === myUsername);
+      fileDiv.className = 'file-message ' + (outgoing ? 'outgoing' : 'incoming');
+      fileDiv.dataset.url = data.url;
+      const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const badge = data.private ? '<span class="private-badge">Private</span>' : '';
+      const delBtn = `<button class="del-file-btn" data-url="${data.url}" title="Delete file from server">🗑</button>`;
 
-        if (data.content_type && data.content_type.startsWith('image/')) {
-            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared an image${delBtn}<br>
-            <img src="${data.url}" alt="${escapeHtml(data.filename)}" />
-            <br><a class="dl-link" href="#" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">⬇ Download</a>
-            <span class="time">${time}</span>`;
-        } else {
-            fileDiv.innerHTML = `<strong>${data.username}:</strong> ${badge}shared a file:${delBtn}
-            <a href="#" class="dl-link" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>
-            <span class="time">${time}</span>`;
-        }
+      if (data.content_type && data.content_type.startsWith('image/')) {
+        fileDiv.innerHTML = `<strong>${escapeHtml(data.username)}</strong><span class="time">${time}</span> ${badge} ${delBtn}<br>
+          <img src="${data.url}" alt="${escapeHtml(data.filename)}" />
+          <br><a class="dl-link" href="#" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">⬇ Download</a>`;
+      } else {
+        fileDiv.innerHTML = `<strong>${escapeHtml(data.username)}</strong><span class="time">${time}</span> ${badge} ${delBtn}<br>
+          📎 <a href="#" class="dl-link" data-url="${data.url}" data-name="${escapeHtml(data.filename)}">${escapeHtml(data.filename)}</a>`;
+      }
 
-        // Wire up download links
-        fileDiv.querySelectorAll('.dl-link').forEach(el => {
-            el.addEventListener('click', (ev) => {
-                ev.preventDefault();
-                downloadFile(el.dataset.url, el.dataset.name);
-            });
+      fileDiv.querySelectorAll('.dl-link').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          downloadFile(el.dataset.url, el.dataset.name);
         });
+      });
 
-        // Wire up delete button
-        fileDiv.querySelectorAll('.del-file-btn').forEach(el => {
-            el.addEventListener('click', async (ev) => {
-                ev.preventDefault();
-                if (!confirm('Delete this file from the server? This cannot be undone.')) return;
-                if (!authPassword) return;
-                const fd = new FormData();
-                fd.append('url', el.dataset.url);
-                fd.append('password', authPassword);
-                try {
-                    const resp = await fetch('/delete-file', { method: 'POST', body: fd });
-                    if (resp.status === 401) alert('Wrong password.');
-                    // On success, the server broadcasts file_deleted; all clients update.
-                } catch (e) { console.error(e); }
-            });
+      fileDiv.querySelectorAll('.del-file-btn').forEach(el => {
+        el.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          if (!confirm('Delete this file from the server? This cannot be undone.')) return;
+          if (!authPassword) return;
+          const fd = new FormData();
+          fd.append('url', el.dataset.url);
+          fd.append('password', authPassword);
+          try {
+            const resp = await fetch('/delete-file', { method: 'POST', body: fd });
+            if (resp.status === 401) alert('Wrong password.');
+          } catch (e) { console.error(e); }
         });
+      });
 
-        messagesDiv.appendChild(fileDiv);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      messagesDiv.appendChild(fileDiv);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    
+    function updateUserList(users) {
+      const userlistDiv = document.getElementById('userlist');
+      let html = `<div class="userlist-header"><span>Online</span><span class="userlist-count">${users.length}</span></div>`;
+      users.forEach(user => {
+        const isMe = user.id === myId;
+        html += `<div class="user-item">
+          <span class="user-name">${escapeHtml(user.username)}${isMe ? ' (you)' : ''}</span>
+          ${!isMe ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
+        </div>`;
+      });
+      userlistDiv.innerHTML = html;
 
-   function updateUserList(users) {
-        const userlistDiv = document.getElementById('userlist');
-        let html = 'Online: ';
-        users.forEach(user => {
-            html += `<div class="user-item">
-            <span>${user.username}</span>
-            ${user.id !== myId ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
-            </div>`;
-        });
-        userlistDiv.innerHTML = html;
+      document.querySelectorAll('.call-btn').forEach(btn => {
+        btn.addEventListener('click', () => startCall(btn.getAttribute('data-id')));
+      });
 
-        document.querySelectorAll('.call-btn').forEach(btn => {
-            btn.addEventListener('click', () => startCall(btn.getAttribute('data-id')));
-        });
-
-        // Rebuild the "Send to" dropdown, preserving the previous selection if still valid
-        const sel = document.getElementById('targetSelect');
-        const prev = sel.value;
-        sel.innerHTML = '<option value="">Everyone</option>';
-        users.forEach(user => {
-            if (user.id === myId) return;
-            const opt = document.createElement('option');
-            opt.value = user.id;
-            opt.textContent = user.username;
-            sel.appendChild(opt);
-        });
-        if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
-        }
+      const sel = document.getElementById('targetSelect');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">Everyone</option>';
+      users.forEach(user => {
+        if (user.id === myId) return;
+        const opt = document.createElement('option');
+        opt.value = user.id;
+        opt.textContent = user.username;
+        sel.appendChild(opt);
+      });
+      if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    }
 
     function sendMessage() {
       const input = document.getElementById('messageInput');
@@ -833,17 +1272,17 @@
     }
 
     async function uploadFile() {
-        const fileInput = document.getElementById('fileInput');
-        const file = fileInput.files[0];
-        if (!file) { alert('Please select a file first.'); return; }
-        if (!authPassword) { alert('Not authenticated.'); return; }
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) { alert('Please select a file first.'); return; }
+      if (!authPassword) { alert('Not authenticated.'); return; }
 
-        const targetId = document.getElementById('targetSelect').value;
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('password', authPassword);
-        if (myId) formData.append('user_id', myId);
-        if (targetId) formData.append('target_id', targetId);
+      const targetId = document.getElementById('targetSelect').value;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('password', authPassword);
+      if (myId) formData.append('user_id', myId);
+      if (targetId) formData.append('target_id', targetId);
 
       try {
         const response = await fetch('/upload', { method: 'POST', body: formData });
@@ -862,24 +1301,24 @@
     }
 
     async function downloadFile(url, filename) {
-        try {
-            const resp = await fetch(url, { cache: 'no-store' });
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            const blob = await resp.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = filename || 'download';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-        } catch (e) {
-            alert('Download failed: ' + e.message);
-        }
-        }
+      try {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename || 'download';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+      } catch (e) {
+        alert('Download failed: ' + e.message);
+      }
+    }
 
-    // ---------------- WebRTC (unchanged) ----------------
+    // ---------------- WebRTC ----------------
     let localStream = null;
     let peerConnection = null;
     let currentCallPartnerId = null;
