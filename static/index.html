@@ -533,7 +533,7 @@
       color: var(--on-surface);
       letter-spacing: -0.01em;
     }
-    #passwordInput {
+    #passwordInput, #nameInput {
       width: 100%;
       padding: 11px 14px;
       border: 1px solid var(--outline-variant);
@@ -546,7 +546,7 @@
       transition: border-color 0.15s, box-shadow 0.15s;
       background: var(--surface-lowest);
     }
-    #passwordInput:focus {
+    #passwordInput:focus, #nameInput:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(0, 88, 190, 0.12);
     }
@@ -750,7 +750,8 @@
   <!-- Login overlay -->
   <div id="loginOverlay">
     <div id="loginBox">
-      <h2>Enter Password</h2>
+      <h2>Join LAN Hub</h2>
+      <input type="text" id="nameInput" placeholder="Your name (e.g., Arya's Laptop)" autocomplete="off" maxlength="32" />
       <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" />
       <button id="loginButton">Join</button>
       <p id="loginError"></p>
@@ -836,11 +837,23 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 
   <script>
-    let ws;
+        let ws;
     let myId = null;
     let myUsername = null;
     let authPassword = sessionStorage.getItem('lanChatPassword');
     let reconnectTimer = null;
+
+    // -------- Stable device identity --------
+    function getOrCreateDeviceId() {
+      let id = localStorage.getItem('lanDeviceId');
+      if (!id) {
+        id = 'dev-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        localStorage.setItem('lanDeviceId', id);
+      }
+      return id;
+    }
+    const deviceId = getOrCreateDeviceId();
+    let displayName = localStorage.getItem('lanDisplayName') || '';
 
     let boardImages = [];
     let featuredId = null;
@@ -861,16 +874,25 @@
       loginError.textContent = '';
     }
 
+        const nameInput = document.getElementById('nameInput');
+    nameInput.value = displayName;
+
     document.getElementById('loginButton').addEventListener('click', () => {
       const pw = passwordInput.value.trim();
+      const name = nameInput.value.trim() || 'My Device';
       if (!pw) return;
       authPassword = pw;
+      displayName = name.slice(0, 32);
       sessionStorage.setItem('lanChatPassword', pw);
+      localStorage.setItem('lanDisplayName', displayName);
       warmUpMicrophone();
       connect();
     });
     passwordInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') document.getElementById('loginButton').click();
+    });
+    nameInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') passwordInput.focus();
     });
 
     // ---------------- Tabs ----------------
@@ -936,8 +958,13 @@
       const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
       ws = new WebSocket(protocol + window.location.host + '/ws');
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'auth', password: authPassword }));
+    ws.onopen = () => {
+        ws.send(JSON.stringify({
+          type: 'auth',
+          password: authPassword,
+          device_id: deviceId,
+          display_name: displayName,
+        }));
       };
 
       ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
@@ -1236,17 +1263,33 @@
     function updateUserList(users) {
       const userlistDiv = document.getElementById('userlist');
       let html = `<div class="userlist-header"><span>Online</span><span class="userlist-count">${users.length}</span></div>`;
-      users.forEach(user => {
+    users.forEach(user => {
         const isMe = user.id === myId;
         html += `<div class="user-item">
           <span class="user-name">${escapeHtml(user.username)}${isMe ? ' (you)' : ''}</span>
-          ${!isMe ? `<button class="call-btn" data-id="${user.id}">📞 Call</button>` : ''}
+          ${isMe
+            ? `<button class="call-btn rename-btn" type="button">✎ Rename</button>`
+            : `<button class="call-btn" data-id="${user.id}">📞 Call</button>`}
         </div>`;
       });
       userlistDiv.innerHTML = html;
 
-      document.querySelectorAll('.call-btn').forEach(btn => {
+            document.querySelectorAll('.call-btn:not(.rename-btn)').forEach(btn => {
         btn.addEventListener('click', () => startCall(btn.getAttribute('data-id')));
+      });
+      document.querySelectorAll('.rename-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = prompt('New display name:', displayName);
+          if (!next) return;
+          const trimmed = next.trim().slice(0, 32);
+          if (!trimmed) return;
+          displayName = trimmed;
+          localStorage.setItem('lanDisplayName', displayName);
+          // Reconnect to apply the new name
+          if (ws) {
+            try { ws.close(); } catch (e) {}
+          }
+        });
       });
 
       const sel = document.getElementById('targetSelect');

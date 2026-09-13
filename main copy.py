@@ -49,40 +49,26 @@ class ConnectionManager:
     def generate_id(self) -> str:
         return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-    async def connect(self, websocket: WebSocket, device_id: str, display_name: str) -> str:
-        # If this device already has a live connection, replace it
-        old_ws = self.active_connections.get(device_id)
-        was_connected = old_ws is not None and old_ws is not websocket
-
-        # Install the new connection FIRST so the old handler's cleanup won't remove it
-        self.active_connections[device_id] = websocket
-        self.usernames[device_id] = display_name
-
-        if was_connected:
-            try:
-                await old_ws.close(code=1000, reason="Replaced by newer session")
-            except Exception:
-                pass
+    async def connect(self, websocket: WebSocket) -> str:
+        user_id = self.generate_id()
+        username = f"User-{random.randint(1000, 9999)}"
+        self.active_connections[user_id] = websocket
+        self.usernames[user_id] = username
 
         await websocket.send_text(json.dumps({
             "type": "welcome",
-            "id": device_id,
-            "username": display_name
+            "id": user_id,
+            "username": username
         }))
         await self.broadcast_user_list()
-        if not was_connected:
-            await self.broadcast_system(f"{display_name} joined the chat")
-        return device_id
+        await self.broadcast_system(f"{username} joined the chat")
+        return user_id
 
-        def disconnect(self, user_id: str, websocket: WebSocket):
-            # Only remove if this is still the current connection for this user.
-            # If the device reconnected, an old handler may fire later — ignore it.
-            if self.active_connections.get(user_id) is not websocket:
-                return None
-            username = self.usernames.get(user_id, "Unknown")
-            self.active_connections.pop(user_id, None)
-            self.usernames.pop(user_id, None)
-            return username
+    def disconnect(self, user_id: str):
+        username = self.usernames.get(user_id, "Unknown")
+        self.active_connections.pop(user_id, None)
+        self.usernames.pop(user_id, None)
+        return username
 
     async def send_to_user(self, user_id: str, data: dict):
         ws = self.active_connections.get(user_id)
@@ -298,7 +284,7 @@ async def upload_file(
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
-    # ---- Auth: first message must be {"type":"auth","password":"...", "device_id":"...", "display_name":"..."} ----
+    # ---- Auth: first message must be {"type":"auth","password":"..."} ----
     try:
         raw = await websocket.receive_text()
         first = json.loads(raw)
@@ -310,18 +296,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008, reason="Unauthorized")
         return
 
-    device_id = (first.get("device_id") or "").strip()
-    display_name = (first.get("display_name") or "").strip()
-
-    if not device_id or len(device_id) > 64:
-        await websocket.close(code=1008, reason="Invalid device_id")
-        return
-
-    if not display_name:
-        display_name = f"User-{device_id[:4].upper()}"
-    display_name = display_name[:32]
-
-    user_id = await manager.connect(websocket, device_id, display_name)
+    user_id = await manager.connect(websocket)
 
     try:
         while True:
@@ -384,10 +359,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 print("Error handling message:", e)
 
     except WebSocketDisconnect:
-        username = manager.disconnect(user_id, websocket)
-        if username is not None:
-            await manager.broadcast_user_list()
-            await manager.broadcast_system(f"{username} left the chat")
+        username = manager.disconnect(user_id)
+        await manager.broadcast_user_list()
+        await manager.broadcast_system(f"{username} left the chat")
 
 
 if __name__ == "__main__":
