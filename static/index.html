@@ -1394,7 +1394,7 @@
       startRingtone();
     }
 
-    document.getElementById('acceptCallBtn').addEventListener('click', async () => {
+        document.getElementById('acceptCallBtn').addEventListener('click', async () => {
       stopRingtone();
       document.getElementById('incomingCall').style.display = 'none';
       try {
@@ -1405,13 +1405,12 @@
         currentCallPartnerId = null;
         return;
       }
+      // Send accept — we do NOT create the offer. The caller will.
       ws.send(JSON.stringify({ type: 'call-accept', target: currentCallPartnerId }));
-      await createPeerConnection();
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      ws.send(JSON.stringify({ type: 'offer', target: currentCallPartnerId, sdp: offer }));
-      showCallStatus(`In call with ${currentCallPartnerId}`);
+      showCallStatus('Connecting...');
       isInCall = true;
+      // Do NOT create the peer connection here. It's created in handleOffer,
+      // which arrives from the caller right after this.
     });
 
     document.getElementById('rejectCallBtn').addEventListener('click', () => {
@@ -1494,8 +1493,13 @@
       return peerConnection;
     }
 
-    async function handleOffer(fromId, sdp) {
+        async function handleOffer(fromId, sdp) {
       if (currentCallPartnerId !== fromId) return;
+      // If a connection already exists (shouldn't, but be defensive), close it first
+      if (peerConnection) {
+        try { peerConnection.close(); } catch (e) {}
+        peerConnection = null;
+      }
       await createPeerConnection();
       await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
       const answer = await peerConnection.createAnswer();
